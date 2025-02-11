@@ -1,16 +1,14 @@
-from os import name
-from numpy import exp
-from pytz import utc
 import torch
+import torch.nn.functional as F
+from numpy import exp
 from torch import GradScaler, autocast, mode, nn
-from zmq import REQ_RELAXED
-from utils.nlp.Vocab import Vocab, load_books
-from utils.datasets.LangDataset import LangDataset
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
+from utils.datasets.LangDataset import LangDataset
 from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
-import torch.nn.functional as F
-from tqdm import tqdm
+from utils.nlp.Vocab import Vocab, load_books
 
 seq_len = 500
 batch_size = 256
@@ -83,7 +81,14 @@ def train(model, begin=0, num_epoch=2000):
             print(
                 f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(loss.item())}"
             )
-            print(predict_seq(model, "the next thing i remember is, waking up with a feeling ", vocab, seq_len=100))
+            print(
+                predict_seq(
+                    model,
+                    "the next thing i remember is, waking up with a feeling ",
+                    vocab,
+                    seq_len=100,
+                )
+            )
             print()
             torch.save(
                 model.state_dict(),
@@ -112,5 +117,4 @@ if __name__ == "__main__":
     #     )
     # )
     model.to(try_gpu())
-    train(model,0)
-    
+    train(model, 0)
