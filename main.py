@@ -79,7 +79,7 @@ def train(model, begin=0, num_epoch=2000):
         with torch.no_grad():
             train_dataset.random_slice()
             print(
-                f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(loss.item())}"
+                f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(epoch_loss/len(train_loader))}"
             )
             print(
                 predict_seq(
