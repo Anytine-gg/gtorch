@@ -1,5 +1,6 @@
 from itertools import count
 from numpy import char, unicode_
+import numpy
 from sympy import N
 import torch
 import re
@@ -51,8 +52,8 @@ def tokenize(books: list[str]):
 
 
 class Vocab:
-    def __init__(self, books, min_freq=10):
-        self.tokens = [c for book in books for c in book]
+    def __init__(self, tokenized_books, min_freq=100):
+        self.tokens = [c for book in tokenized_books for c in book]
         self.token_counts = Counter(self.tokens)
         self.sorted_token_counts = self.token_counts.most_common()
 
@@ -71,12 +72,12 @@ class Vocab:
         return self.vocab_size
 
     def __getitem__(self, tokens):
-        if not isinstance(tokens, (list, tuple)):
+        if not isinstance(tokens, (list, tuple, numpy.ndarray)):
             return self.token_to_idx.get(tokens, self.unk)
         return [self.__getitem__(token) for token in tokens]
 
     def to_tokens(self, indices):
-        if not isinstance(indices, (list, tuple)):
+        if not isinstance(indices, (list, tuple, numpy.ndarray)):
             return self.idx_to_token[indices]
         return [self.idx_to_token[index] for index in indices]
 
@@ -101,5 +102,6 @@ class Vocab:
 
 if __name__ == "__main__":
     books = load_books("/root/projs/py/demo/books")
-    vocab = Vocab(books=books)
-    print(vocab[['我','是','大','傻','逼']])
+    books = tokenize(books=books)
+    vocab = Vocab(tokenized_books=books)
+    print(vocab[["我", "是", "大", "傻", "逼"]])

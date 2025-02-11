@@ -17,8 +17,8 @@ class LSTM_demo(nn.Module):
         # 前向传播 LSTM
         out, state = self.lstm(x, (h0, c0))
         
+        out = out.reshape((-1,self.hidden_size))
         out = self.fc(out)
-        
         return out,state
 
 if __name__ == '__main__':
