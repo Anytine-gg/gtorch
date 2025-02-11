@@ -77,7 +77,7 @@ class Vocab:
         self.tokens = [c for book in tokenized_books for c in book]
         self.token_counts = Counter(self.tokens)
         self.sorted_token_counts = self.token_counts.most_common()
-
+           
         self.unk = 0
         self.uniq_tokens = ["<unk>"]
         for token in self.sorted_token_counts:
