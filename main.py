@@ -1,4 +1,5 @@
 from ctypes import util
+from arrow import get
 from numpy import exp
 from pytz import utc
 import torch
@@ -11,7 +12,7 @@ from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
 import torch.nn.functional as F
 
-seq_len = 32
+seq_len = 64  
 batch_size = 128
 num_layers = 2
 hidden_size = 256
@@ -22,7 +23,7 @@ vocab = train_dataset.vocab
 train_loader = DataLoader(
     train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
 )
-print(vocab.vocab_size)
+
 
 
 def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
@@ -51,7 +52,7 @@ def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
 
 
 def train():
-    num_epoch = 500
+    num_epoch = 2000
     ce_loss = nn.CrossEntropyLoss()
     input_sz = output_sz = vocab_sz = len(vocab)
     model = LSTM_demo(input_sz, hidden_size, num_layers, output_sz)
@@ -80,5 +81,17 @@ def train():
             f"/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
         )
 
+
+def get_predict():
+    input_sz = output_sz = vocab_sz = len(vocab)
+    model = LSTM_demo(input_sz, hidden_size, num_layers, output_sz)
+    model.load_state_dict(
+        torch.load(
+            "/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model499.pth",
+            weights_only=True,
+        )
+    )
+    model.to(try_gpu())
+    print(predict_seq(model=model,input_seq='To be or not to be',vocab=vocab,seq_len=10000))
 
 train()
