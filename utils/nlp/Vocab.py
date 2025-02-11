@@ -47,12 +47,33 @@ def load_books(path: str) -> list[str]:
     return books
 
 
+def load_en_books(path: str) -> list[str]:
+    books = []
+    # 定义正则表达式，匹配非 ASCII 字符
+    pattern = re.compile(r"[^\x00-\x7F]+")
+
+    # 遍历指定路径下的所有文件
+    for root, _, files in os.walk(path):
+        for file in files:
+            if file.endswith(".txt"):
+                file_path = os.path.join(root, file)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    # 使用正则表达式替换掉非 ASCII 字符
+                    cleaned_content = re.sub(pattern, "", content)
+                    cleaned_content = cleaned_content.lower()
+
+                    books.append(cleaned_content)
+
+    return books
+
+
 def tokenize(books: list[str]):
     return [list(book) for book in books]
 
 
 class Vocab:
-    def __init__(self, tokenized_books, min_freq=100):
+    def __init__(self, tokenized_books, min_freq=0):
         self.tokens = [c for book in tokenized_books for c in book]
         self.token_counts = Counter(self.tokens)
         self.sorted_token_counts = self.token_counts.most_common()
@@ -101,7 +122,7 @@ class Vocab:
 
 
 if __name__ == "__main__":
-    books = load_books("/root/projs/py/demo/books")
+    books = load_en_books("/root/projs/py/demo/enbooks")
     books = tokenize(books=books)
     vocab = Vocab(tokenized_books=books)
-    print(vocab[["我", "是", "大", "傻", "逼"]])
+    print(vocab.__len__())
