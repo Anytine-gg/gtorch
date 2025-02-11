@@ -24,5 +24,5 @@ class LSTM_demo(nn.Module):
 if __name__ == '__main__':
     model = LSTM_demo(30,256,2,30)
     data = torch.randn(35,100,30)
-
+     
     print(model(data)[0].shape)
