@@ -2,6 +2,7 @@ from ctypes import util
 from arrow import get
 from numpy import exp
 from pytz import utc
+from scipy import datasets
 import torch
 from torch import mode, nn
 from zmq import REQ_RELAXED
@@ -13,8 +14,8 @@ from utils.mytorch import try_gpu
 import torch.nn.functional as F
 
 seq_len = 64  
-batch_size = 128
-num_layers = 2
+batch_size = 64
+num_layers = 3
 hidden_size = 256
 train_dataset = LangDataset(
     books_path="/root/projs/py/demo/enbooks", seq_len=seq_len, min_freq=0
@@ -72,9 +73,10 @@ def train():
             model.zero_grad()
             loss.backward()
             optimizer.step()
+        train_dataset.random_slice()
         print("Epoch:", epoch)
         print(loss.item(), " ", exp(loss.item()))
-        print(predict_seq(model, "my name is ", vocab))
+        print(predict_seq(model, "my name is ", vocab,seq_len=100))
         print()
         torch.save(
             model.state_dict(),
@@ -87,11 +89,11 @@ def get_predict():
     model = LSTM_demo(input_sz, hidden_size, num_layers, output_sz)
     model.load_state_dict(
         torch.load(
-            "/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model499.pth",
+            "/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model215.pth",
             weights_only=True,
         )
     )
     model.to(try_gpu())
-    print(predict_seq(model=model,input_seq='To be or not to be',vocab=vocab,seq_len=10000))
+    print(predict_seq(model=model,input_seq='My name is ',vocab=vocab,seq_len=1000))
 
 train()
