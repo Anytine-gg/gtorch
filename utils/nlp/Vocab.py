@@ -1,7 +1,6 @@
 from itertools import count
 from numpy import char, unicode_
 import numpy
-from sympy import N
 import torch
 import re
 import os
