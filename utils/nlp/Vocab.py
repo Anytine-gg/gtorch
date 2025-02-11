@@ -49,19 +49,20 @@ def load_books(path: str) -> list[str]:
 
 def load_en_books(path: str) -> list[str]:
     books = []
-    # 定义正则表达式，匹配非 ASCII 字符
-    pattern = re.compile(r"[^\x00-\x7F]+")
+    # 定义正则表达式，匹配非字母、数字、空格、常用标点符号和换行符的字符
+    pattern = re.compile(r"[^a-z\s.,!?;:'\"()\n-]")
 
     # 遍历指定路径下的所有文件
     for root, _, files in os.walk(path):
         for file in files:
             if file.endswith(".txt"):
                 file_path = os.path.join(root, file)
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                    # 使用正则表达式替换掉非 ASCII 字符
-                    cleaned_content = re.sub(pattern, "", content)
-                    cleaned_content = cleaned_content.lower()
+                    # 将内容转换为小写
+                    cleaned_content = content.lower()
+                    # 使用正则表达式替换掉非字母、数字、空格、常用标点符号和换行符的字符
+                    cleaned_content = re.sub(pattern, "", cleaned_content)
 
                     books.append(cleaned_content)
 
