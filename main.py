@@ -10,10 +10,10 @@ from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
 import torch.nn.functional as F
 from tqdm import tqdm
-seq_len = 100
+seq_len = 160
 batch_size = 256
-num_layers = 2
-hidden_size = 256
+num_layers = 4
+hidden_size = 512
 train_dataset = LangDataset(
     books_path="/root/projs/py/demo/enbooks", seq_len=seq_len, min_freq=0
 )
