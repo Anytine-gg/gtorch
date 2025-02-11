@@ -52,7 +52,7 @@ def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
 
 def train(model, begin=0, num_epoch=2000):
     ce_loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(lr=0.01, params=model.parameters())
+    optimizer = torch.optim.Adam(lr=0.001, params=model.parameters())
     scaler = GradScaler()
     for epoch in range(begin, num_epoch):
         model.train()
@@ -78,16 +78,17 @@ def train(model, begin=0, num_epoch=2000):
                 epoch_loss += loss.item()
                 pbar.set_postfix({"loss": loss.item()})
                 pbar.update(1)
-        train_dataset.random_slice()
-        print(
-            f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(loss.item())}"
-        )
-        print(predict_seq(model, "my name is ", vocab, seq_len=100))
-        print()
-        torch.save(
-            model.state_dict(),
-            f"/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
-        )
+        with torch.no_grad():
+            train_dataset.random_slice()
+            print(
+                f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(loss.item())}"
+            )
+            print(predict_seq(model, "the next thing i remember is, waking up with a feeling ", vocab, seq_len=100))
+            print()
+            torch.save(
+                model.state_dict(),
+                f"/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
+            )
 
 
 def get_predict(model):
