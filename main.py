@@ -10,16 +10,16 @@ from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
 
-seq_len = 500
+seq_len = 300
 batch_size = 256
 num_layers = 3
 hidden_size = 256
 train_dataset = LangDataset(
-    books_path="/root/projs/py/demo/mytorch/enbooks", seq_len=seq_len, min_freq=0
+    books_path="/root/projs/python/mytorch/enbooks", seq_len=seq_len, min_freq=0
 )
 vocab = train_dataset.vocab
 train_loader = DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
+    dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
 )
 
 
@@ -92,7 +92,7 @@ def train(model, begin=0, num_epoch=2000):
             print()
             torch.save(
                 model.state_dict(),
-                f"/root/projs/py/demo/mytorch/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
+                f"/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
             )
 
 
