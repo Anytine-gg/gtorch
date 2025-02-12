@@ -3,11 +3,14 @@ from torch import nn
 
 
 class LSTM_demo(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
+    def __init__(
+        self, input_size, embedding_size, hidden_size, num_layers, output_size
+    ):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers)
+        self.embedding = nn.Embedding(input_size, embedding_size)
+        self.lstm = nn.LSTM(embedding_size, hidden_size, num_layers)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x, h0=None, c0=None):
@@ -17,9 +20,9 @@ class LSTM_demo(nn.Module):
             c0 = torch.zeros(self.num_layers, x.size(1), self.hidden_size).to(x.device)
 
         # 前向传播 LSTM
+        x = self.embedding(x)
         out, state = self.lstm(x, (h0, c0))
 
-        out = out.reshape((-1, self.hidden_size))
         out = self.fc(out)
         return out, state
 
