@@ -10,14 +10,16 @@ from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
 
-seq_len = 300
+seq_len = 30
 batch_size = 256
 num_layers = 3
 hidden_size = 256
 train_dataset = LangDataset(
-    books_path="/root/projs/python/mytorch/enbooks", seq_len=seq_len, min_freq=0
+    books_path="/root/projs/python/mytorch/books", seq_len=seq_len, min_freq=100,lang='zh'
 )
+
 vocab = train_dataset.vocab
+print(f'vocab size: {len(vocab)}')
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
 )
@@ -84,7 +86,7 @@ def train(model, begin=0, num_epoch=2000):
             print(
                 predict_seq(
                     model,
-                    "the next thing i remember is, waking up with a feeling ",
+                    "今天是星期四，威我五十看看实力， ",
                     vocab,
                     seq_len=100,
                 )
@@ -100,9 +102,9 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="the next thing i remember is, waking up with a feeling as if i had had a frightful n",
+            input_seq="环滁皆山也。其西南诸峰，林壑尤美，望之蔚然而深秀者，琅琊也。山行六七里，渐闻水声潺潺而泻出于两峰之间者，酿泉也。峰回路转，有亭翼然临于泉上者，醉翁",
             vocab=vocab,
-            seq_len=1000,
+            seq_len=10000,
         )
     )
 
@@ -110,11 +112,11 @@ def get_predict(model):
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
     model = LSTM_demo(input_sz, hidden_size, num_layers, output_sz)
-    # model.load_state_dict(
-    #     torch.load(
-    #         "/root/projs/py/demo/saved_models/lstm/enbooks/lstm_model62.pth",
-    #         weights_only=True,
-    #     )
-    # )
+    model.load_state_dict(
+        torch.load(
+            "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model607.pth",
+            weights_only=True,
+        )
+    )
     model.to(try_gpu())
-    train(model, 0)
+    get_predict(model)
