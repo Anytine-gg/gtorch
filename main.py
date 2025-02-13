@@ -38,7 +38,9 @@ def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
             pred, (h, c) = model(feature, h0=h, c0=c)
         output_seq = input_seq + vocab.to_tokens(torch.argmax(pred.reshape(-1), dim=0))
         for _ in range(seq_len):
-            feature = torch.tensor(vocab[output_seq[-1]]).reshape(1, 1).long().to(try_gpu())
+            feature = (
+                torch.tensor(vocab[output_seq[-1]]).reshape(1, 1).long().to(try_gpu())
+            )
             pred, (h, c) = model(feature, h0=h, c0=c)
             output_seq += vocab.to_tokens(torch.argmax(pred.reshape(-1), dim=0))
         return output_seq
@@ -68,7 +70,7 @@ def train(model, begin=0, num_epoch=2000):
 
                 with autocast("cuda"):
                     predict, (h, c) = model(feature)
-                    predict = predict.permute(1,2,0)
+                    predict = predict.permute(1, 2, 0)
                     label = label.T
                     loss = ce_loss(predict, label)
 
@@ -103,9 +105,9 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="今天是疯狂星期四，威我五十看看实力，",
+            input_seq="有了这点简单的分析，我们再说祥子的地位，就象说——我们希望——一盘机器上的某种钉子那么准确了。祥子，在与“骆驼”这个外号发生关系以前，是个较比有自由的洋车夫，这就是说，他是属于年轻力壮，而且自己有车的那一类：自己的车，自己的生活，都在自己手里，高等车夫。这可绝不是件容易的事。一年，二年，至少有三四年；一滴汗，两滴汗，不知道多少万滴汗，才挣出那辆车。从风里雨里的咬牙，从饭里茶里的自苦，才赚出那辆车。那辆车是他的一切挣扎与困苦的总结果与报酬，象身经百战的武士的一颗徽章。在他赁人家的车的时候，他从早到晚，由东到西，由南到北，象被人家抽着转的陀",
             vocab=vocab,
-            seq_len=10000,
+            seq_len=4000,
         )
     )
 
@@ -120,12 +122,12 @@ if __name__ == "__main__":
         num_layers=num_layers,
         output_size=output_sz,
     )
-    # model.load_state_dict(
-    #     torch.load(
-    #         "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model607.pth",
-    #         weights_only=True,
-    #     )
-    # )
+    model.load_state_dict(
+        torch.load(
+            "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model1999.pth",
+            weights_only=True,
+        )
+    )
     model.to(try_gpu())
-    # get_predict(model)
-    train(model,0)
+    get_predict(model)
+    # train(model,0)
