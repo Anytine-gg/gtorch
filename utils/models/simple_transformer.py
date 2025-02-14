@@ -36,15 +36,14 @@ class DecoderOnlyBlock(nn.Module):
     def forward(self, x, mask=None):
         # x.shape = seq_len,batch_size,hidden_size
 
-        # mask self-attention
-
-        attention_output, _ = self.attention(x, x, x, attn_mask=mask)
+       # Pre-LN结构
+        norm_x = self.ln1(x)
+        attention_output, _ = self.attention(norm_x, norm_x, norm_x, attn_mask=mask)
         x = x + self.dropout1(attention_output)
-        x = self.ln1(x)
-        # FFN
-        ffn_output = self.linear2(self.dropout(F.relu(self.linear1(x))))
+    
+        norm_x = self.ln2(x)
+        ffn_output = self.linear2(self.dropout(F.relu(self.linear1(norm_x))))
         x = x + self.dropout2(ffn_output)
-        x = self.ln2(x)
         return x
 
 
@@ -72,6 +71,9 @@ class TransformerDecoderOnly(nn.Module):
         )
 
         self.ln = nn.LayerNorm(hidden_size)
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, x):
         # shape: batch_size seq_len

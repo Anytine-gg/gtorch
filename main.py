@@ -11,13 +11,13 @@ from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
 from utils.models.simple_transformer import TransformerDecoderOnly, Classify
 
-seq_len = 512
-batch_size = 64
+seq_len = 256
+batch_size = 128
 
 train_dataset = LangDataset(
     books_path="/root/projs/python/mytorch/enbooks/1",
     seq_len=seq_len,
-    min_freq=100,
+    min_freq=10,
     lang="en",
 )
 
@@ -46,7 +46,7 @@ def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
 
 def train(model, begin=0, num_epoch=2000):
     ce_loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(lr=0.001, params=model.parameters())
+    optimizer = torch.optim.Adam(lr=0.01, params=model.parameters(),weight_decay=1e-4)
     scaler = GradScaler()
     for epoch in range(begin, num_epoch):
         model.train()
@@ -71,14 +71,13 @@ def train(model, begin=0, num_epoch=2000):
                 pbar.set_postfix({"loss": loss.item()})
                 pbar.update(1)
         with torch.no_grad():
-            train_dataset.random_slice()
             print(
                 f"Epoch {epoch+1}, Loss: {epoch_loss/len(train_loader)}, Perplexity :{exp(epoch_loss/len(train_loader))}"
             )
             print(
                 predict_seq(
                     model,
-                    "to be or not to be,",
+                    "Do you know about ",
                     vocab,
                     seq_len=200,
                 )
@@ -94,7 +93,7 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="my name is ",
+            input_seq="Do you know about ",
             vocab=vocab,
             seq_len=100,
         )
@@ -103,15 +102,15 @@ def get_predict(model):
 
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
-    embedding_size = 128
+    embedding_size = 64
     model = nn.Sequential(
         TransformerDecoderOnly(
             vocab_size=vocab_sz,
             hidden_size=embedding_size,
-            nhead=8,
+            nhead=2,
             num_layers=2,
-            ffn_hidden_size=256,
-            dropout=0.1,
+            ffn_hidden_size=128,
+            dropout=0.4,
             max_seqlen=1024
         ),
         Classify(embedding_size,vocab_sz)
