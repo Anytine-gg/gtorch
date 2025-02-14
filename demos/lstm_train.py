@@ -108,7 +108,7 @@ def get_predict(model):
 
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
-    embedding_size = 50
+    embedding_size = 256
     model = LSTM_demo(
         input_size=input_sz,
         embedding_size=embedding_size,

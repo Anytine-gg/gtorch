@@ -6,19 +6,19 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from utils.datasets.LangDataset import LangDataset
-from utils.models.LTSM import LSTM_demo
+
 from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
 from utils.models.simple_transformer import TransformerDecoderOnly, Classify
 
-seq_len = 1000
+seq_len = 512
 batch_size = 64
 
 train_dataset = LangDataset(
-    books_path="/root/projs/python/mytorch/books/2",
+    books_path="/root/projs/python/mytorch/enbooks/1",
     seq_len=seq_len,
-    min_freq=20,
-    lang="zh",
+    min_freq=100,
+    lang="en",
 )
 
 vocab = train_dataset.vocab
@@ -78,7 +78,7 @@ def train(model, begin=0, num_epoch=2000):
             print(
                 predict_seq(
                     model,
-                    "今天是星期四，威我五十看看实力， ",
+                    "to be or not to be,",
                     vocab,
                     seq_len=200,
                 )
@@ -86,7 +86,7 @@ def train(model, begin=0, num_epoch=2000):
             print()
             torch.save(
                 model.state_dict(),
-                f"/root/projs/python/mytorch/saved_models/trans/zhbooks/trans_model{epoch}.pth",
+                f"/root/projs/python/mytorch/saved_models/trans/enbooks/trans_model{epoch}.pth",
             )
 
 
@@ -94,7 +94,7 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="有了这点简单的分析，我们再说祥子的地位，就象说——我们希望——一",
+            input_seq="my name is ",
             vocab=vocab,
             seq_len=100,
         )
@@ -103,15 +103,16 @@ def get_predict(model):
 
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
-    embedding_size = 64
+    embedding_size = 128
     model = nn.Sequential(
         TransformerDecoderOnly(
             vocab_size=vocab_sz,
             hidden_size=embedding_size,
-            nhead=4,
+            nhead=8,
             num_layers=2,
-            ffn_hidden_size=128,
-            dropout=0.2,
+            ffn_hidden_size=256,
+            dropout=0.1,
+            max_seqlen=1024
         ),
         Classify(embedding_size,vocab_sz)
     )
