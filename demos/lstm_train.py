@@ -45,12 +45,6 @@ def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
             output_seq += vocab.to_tokens(torch.argmax(pred.reshape(-1), dim=0))
         return output_seq
 
-    # 获取预测结果的索引
-    predicted_indices = torch.argmax(predict, dim=1).cpu().numpy()
-    # 将索引转换为词
-    predicted_tokens = vocab.to_tokens(predicted_indices)
-
-    return predicted_tokens
 
 
 def train(model, begin=0, num_epoch=2000):

@@ -9,11 +9,11 @@ from utils.datasets.LangDataset import LangDataset
 from utils.models.LTSM import LSTM_demo
 from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
+from utils.models.simple_transformer import TransformerDecoderOnly, Classify
 
-seq_len = 200
+seq_len = 1000
 batch_size = 64
-num_layers = 1
-hidden_size = 256
+
 train_dataset = LangDataset(
     books_path="/root/projs/python/mytorch/books/2",
     seq_len=seq_len,
@@ -31,26 +31,17 @@ train_loader = DataLoader(
 def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
     model.eval()
     with torch.no_grad():
-        h = torch.zeros(num_layers, 1, hidden_size).to(try_gpu())
-        c = torch.zeros(num_layers, 1, hidden_size).to(try_gpu())
-        for char in input_seq:
-            feature = torch.tensor(vocab[char]).reshape(1, 1).long().to(try_gpu())
-            pred, (h, c) = model(feature, h0=h, c0=c)
-        output_seq = input_seq + vocab.to_tokens(torch.argmax(pred.reshape(-1), dim=0))
+        seq = [vocab[c] for c in input_seq]
+        seq = torch.tensor(seq).reshape(1,-1).to(try_gpu())
+        seq_out = input_seq
         for _ in range(seq_len):
-            feature = (
-                torch.tensor(vocab[output_seq[-1]]).reshape(1, 1).long().to(try_gpu())
-            )
-            pred, (h, c) = model(feature, h0=h, c0=c)
-            output_seq += vocab.to_tokens(torch.argmax(pred.reshape(-1), dim=0))
-        return output_seq
-
-    # 获取预测结果的索引
-    predicted_indices = torch.argmax(predict, dim=1).cpu().numpy()
-    # 将索引转换为词
-    predicted_tokens = vocab.to_tokens(predicted_indices)
-
-    return predicted_tokens
+            predict_out = model(seq)    
+            predicted_indices = torch.argmax(predict_out, dim=-1).cpu().numpy()
+            last_predict = torch.tensor([[predicted_indices[0,-1]]], device=seq.device)
+            seq = torch.cat([seq,last_predict],dim=1).to(try_gpu()) 
+            seq_out += vocab.to_tokens(last_predict)
+        
+        return seq_out
 
 
 def train(model, begin=0, num_epoch=2000):
@@ -62,16 +53,14 @@ def train(model, begin=0, num_epoch=2000):
         epoch_loss = 0
         with tqdm(total=len(train_loader), desc=f"Epoch {epoch+1}/{num_epoch}") as pbar:
             for feature, label in train_loader:
-                feature = feature.T.long()
-                label = label.T
                 feature = feature.to(try_gpu())
                 label = label.to(try_gpu())
                 model.zero_grad()
 
                 with autocast("cuda"):
-                    predict, (h, c) = model(feature)
-                    predict = predict.permute(1, 2, 0)
-                    label = label.T
+                    predict = model(feature)
+                    predict = predict.permute(0,2,1)
+                
                     loss = ce_loss(predict, label)
 
                 scaler.scale(loss).backward()
@@ -91,13 +80,13 @@ def train(model, begin=0, num_epoch=2000):
                     model,
                     "今天是星期四，威我五十看看实力， ",
                     vocab,
-                    seq_len=100,
+                    seq_len=200,
                 )
             )
             print()
             torch.save(
                 model.state_dict(),
-                f"/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model{epoch}.pth",
+                f"/root/projs/python/mytorch/saved_models/trans/zhbooks/trans_model{epoch}.pth",
             )
 
 
@@ -105,29 +94,33 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="有了这点简单的分析，我们再说祥子的地位，就象说——我们希望——一盘机器上的某种钉子那么准确了。祥子，在与“骆驼”这个外号发生关系以前，是个较比有自由的洋车夫，这就是说，他是属于年轻力壮，而且自己有车的那一类：自己的车，自己的生活，都在自己手里，高等车夫。这可绝不是件容易的事。一年，二年，至少有三四年；一滴汗，两滴汗，不知道多少万滴汗，才挣出那辆车。从风里雨里的咬牙，从饭里茶里的自苦，才赚出那辆车。那辆车是他的一切挣扎与困苦的总结果与报酬，象身经百战的武士的一颗徽章。在他赁人家的车的时候，他从早到晚，由东到西，由南到北，象被人家抽着转的陀",
+            input_seq="有了这点简单的分析，我们再说祥子的地位，就象说——我们希望——一",
             vocab=vocab,
-            seq_len=4000,
+            seq_len=100,
         )
     )
 
 
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
-    embedding_size = 50
-    model = LSTM_demo(
-        input_size=input_sz,
-        embedding_size=embedding_size,
-        hidden_size=hidden_size,
-        num_layers=num_layers,
-        output_size=output_sz,
+    embedding_size = 64
+    model = nn.Sequential(
+        TransformerDecoderOnly(
+            vocab_size=vocab_sz,
+            hidden_size=embedding_size,
+            nhead=4,
+            num_layers=2,
+            ffn_hidden_size=128,
+            dropout=0.2,
+        ),
+        Classify(embedding_size,vocab_sz)
     )
-    model.load_state_dict(
-        torch.load(
-            "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model1999.pth",
-            weights_only=True,
-        )
-    )
+    # model.load_state_dict(
+    #     torch.load(
+    #         "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model1999.pth",
+    #         weights_only=True,
+    #     )
+    # )
     model.to(try_gpu())
-    get_predict(model)
-    # train(model,0)
+    # get_predict(model)
+    train(model,0)
