@@ -11,8 +11,8 @@ from utils.mytorch import try_gpu
 from utils.nlp.Vocab import Vocab, load_books
 from utils.models.simple_transformer import TransformerDecoderOnly, Classify
 
-seq_len = 256
-batch_size = 128
+seq_len = 64
+batch_size = 256
 
 train_dataset = LangDataset(
     books_path="/root/projs/python/mytorch/enbooks/1",
@@ -107,10 +107,10 @@ if __name__ == "__main__":
         TransformerDecoderOnly(
             vocab_size=vocab_sz,
             hidden_size=embedding_size,
-            nhead=2,
-            num_layers=2,
-            ffn_hidden_size=128,
-            dropout=0.4,
+            nhead=4,
+            num_layers=4,
+            ffn_hidden_size=256,
+            dropout=0.02,
             max_seqlen=1024
         ),
         Classify(embedding_size,vocab_sz)
