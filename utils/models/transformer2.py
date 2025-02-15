@@ -50,7 +50,7 @@ class GPTEncoder(nn.Module):
         x = self.dropout(x)
 
         # GPT 风格的下三角掩码
-        attn_mask = self.mask[:, :seq_len, :seq_len]
+        attn_mask = self.mask[0, :seq_len, :seq_len]
         attn_mask = (attn_mask == 0)
 
         for layer in self.layers:

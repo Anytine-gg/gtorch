@@ -18,7 +18,7 @@ if __name__ == "__main__":
     batch_size = 16
 
     train_dataset = LangDataset(
-        books_path="/Users/guoziye/Library/CloudStorage/OneDrive-个人/code/multiplatform/Python/mytorch/enbooks/1",
+        books_path="/root/projs/python/mytorch/enbooks/1",
         seq_len=seq_len,
         min_freq=100,
         lang="en",
