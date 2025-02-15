@@ -12,12 +12,12 @@ from utils.nlp.Vocab import Vocab, load_books
 from utils.models.simple_transformer import TransformerDecoderOnly, Classify
 
 seq_len = 64
-batch_size = 256
+batch_size = 128
 
 train_dataset = LangDataset(
     books_path="/root/projs/python/mytorch/enbooks/1",
     seq_len=seq_len,
-    min_freq=10,
+    min_freq=100,
     lang="en",
 )
 
@@ -31,28 +31,42 @@ train_loader = DataLoader(
 def predict_seq(model, input_seq, vocab: Vocab, seq_len=32):
     model.eval()
     with torch.no_grad():
+        # 形状: [seq_len, batch_size=1]
         seq = [vocab[c] for c in input_seq]
-        seq = torch.tensor(seq).reshape(1,-1).to(try_gpu())
+        seq = torch.tensor(seq).unsqueeze(1).to(try_gpu())
+
         seq_out = input_seq
         for _ in range(seq_len):
-            predict_out = model(seq)    
+            # 模型输出: [seq_len, batch_size, vocab_size]
+            predict_out = model(seq)
+            # 在 vocab_size 这个维度 argmax => [seq_len, batch_size]
             predicted_indices = torch.argmax(predict_out, dim=-1).cpu().numpy()
-            last_predict = torch.tensor([[predicted_indices[0,-1]]], device=seq.device)
-            seq = torch.cat([seq,last_predict],dim=1).to(try_gpu()) 
+
+            # 取最后一个时间步的 token（序列维度在 0，所以 predicted_indices[-1, 0]）
+            last_token_idx = predicted_indices[-1, 0]
+            last_predict   = torch.tensor([[last_token_idx]], device=seq.device)  # shape [1,1]
+
+            # 拼接时要在 seq_len 这个维度上追加（dim=0）
+            seq = torch.cat([seq, last_predict], dim=0)
+ 
+
+            # 将索引转换为空间的 token
             seq_out += vocab.to_tokens(last_predict)
-        
+  
         return seq_out
 
 
 def train(model, begin=0, num_epoch=2000):
     ce_loss = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(lr=0.01, params=model.parameters(),weight_decay=1e-4)
+    optimizer = torch.optim.AdamW(lr=0.0001, params=model.parameters(),weight_decay=0.01)
     scaler = GradScaler()
     for epoch in range(begin, num_epoch):
         model.train()
         epoch_loss = 0
         with tqdm(total=len(train_loader), desc=f"Epoch {epoch+1}/{num_epoch}") as pbar:
             for feature, label in train_loader:
+                feature = feature.T
+                label = label.T
                 feature = feature.to(try_gpu())
                 label = label.to(try_gpu())
                 model.zero_grad()
@@ -60,7 +74,7 @@ def train(model, begin=0, num_epoch=2000):
                 with autocast("cuda"):
                     predict = model(feature)
                     predict = predict.permute(0,2,1)
-                
+
                     loss = ce_loss(predict, label)
 
                 scaler.scale(loss).backward()
@@ -77,7 +91,7 @@ def train(model, begin=0, num_epoch=2000):
             print(
                 predict_seq(
                     model,
-                    "Do you know about ",
+                    "to be or",
                     vocab,
                     seq_len=200,
                 )
@@ -93,7 +107,7 @@ def get_predict(model):
     print(
         predict_seq(
             model=model,
-            input_seq="Do you know about ",
+            input_seq="to be or ",
             vocab=vocab,
             seq_len=100,
         )
@@ -102,19 +116,16 @@ def get_predict(model):
 
 if __name__ == "__main__":
     input_sz = output_sz = vocab_sz = len(vocab)
-    embedding_size = 64
-    model = nn.Sequential(
-        TransformerDecoderOnly(
+    embedding_size = 768
+    model = TransformerDecoderOnly(
             vocab_size=vocab_sz,
             hidden_size=embedding_size,
             nhead=4,
-            num_layers=4,
-            ffn_hidden_size=256,
-            dropout=0.02,
+            num_layers=2,
+            ffn_hidden_size=1024,
+            dropout=0.1,
             max_seqlen=1024
-        ),
-        Classify(embedding_size,vocab_sz)
-    )
+        )
     # model.load_state_dict(
     #     torch.load(
     #         "/root/projs/python/mytorch/saved_models/lstm/enbooks/lstm_model1999.pth",
