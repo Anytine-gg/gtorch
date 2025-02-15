@@ -1,71 +1,96 @@
+# ...existing code...
 import torch
 import torch.nn as nn
 import math
-
-
-class PositionalEncoding(nn.Module):
-    """位置编码层（支持动态长度）"""
-
-    def __init__(self, d_model: int, max_len: int = 5000):
+from tqdm import tqdm
+class GPTBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads, dropout=0.1):
         super().__init__()
-        position = torch.arange(max_len).unsqueeze(1)  # (max_len, 1)
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
-        )  # (d_model//2,)
-        pe = torch.zeros(1, max_len, d_model)  # (1, max_len, d_model)
-        pe[0, :, 0::2] = torch.sin(position * div_term)
-        pe[0, :, 1::2] = torch.cos(position * div_term)
-        self.register_buffer("pe", pe)
+        self.ln_1 = nn.LayerNorm(embed_dim)
+        self.ln_2 = nn.LayerNorm(embed_dim)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x + self.pe[:, : x.size(1)]
-
-
-class DecoderOnlyTransformer(nn.Module):
-    """纯 Decoder-Only Transformer（类似 GPT 结构）"""
-
-    def __init__(
-        self,
-        vocab_size: int,
-        d_model: int = 512,
-        nhead: int = 8,
-        num_layers: int = 6,
-        dim_feedforward: int = 2048,
-        max_len: int = 100,
-    ):
-        super().__init__()
-        self.d_model = d_model
-        self.embedding = nn.Embedding(vocab_size, d_model)
-        self.pos_encoder = PositionalEncoding(d_model, max_len)
-        self.layers = nn.ModuleList(
-            [
-                nn.TransformerDecoderLayer(
-                    d_model,
-                    nhead,
-                    dim_feedforward,
-                    activation="gelu",
-                    batch_first=False,
-                )
-                for _ in range(num_layers)
-            ]
+        self.attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
+        self.mlp = nn.Sequential(
+            nn.Linear(embed_dim, 4 * embed_dim),
+            nn.GELU(),
+            nn.Linear(4 * embed_dim, embed_dim),
+            nn.Dropout(dropout)
         )
-        self.fc_out = nn.Linear(d_model, vocab_size)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (seq_len, batch)
-        x_emb = self.embedding(x) * math.sqrt(self.d_model)  # (seq_len, batch, d_model)
-        x_emb = self.pos_encoder(x_emb)
-        causal_mask = self._generate_square_subsequent_mask(x.size(0)).to(x.device)
+    def forward(self, x, attn_mask=None):
+        # 自注意力
+        x_norm = self.ln_1(x)
+        attn_output, _ = self.attn(x_norm, x_norm, x_norm, attn_mask=attn_mask)
+        x = x + attn_output
 
-        # 逐层处理
+        # 前馈网络
+        x_norm = self.ln_2(x)
+        mlp_output = self.mlp(x_norm)
+        x = x + mlp_output
+        return x
+
+class GPTEncoder(nn.Module):
+    def __init__(self, vocab_size, embed_dim, num_heads, num_layers, max_len=512, dropout=0.1):
+        super().__init__()
+        self.token_emb = nn.Embedding(vocab_size, embed_dim)
+        self.pos_emb = nn.Embedding(max_len, embed_dim)
+        self.layers = nn.ModuleList([
+            GPTBlock(embed_dim, num_heads, dropout) for _ in range(num_layers)
+        ])
+        self.ln_f = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.register_buffer("mask", torch.tril(torch.ones(max_len, max_len)).unsqueeze(0))
+
+    def forward(self, input_ids):
+        bsz, seq_len = input_ids.shape
+        positions = torch.arange(0, seq_len, dtype=torch.long, device=input_ids.device)
+        token_embeddings = self.token_emb(input_ids)
+        position_embeddings = self.pos_emb(positions)
+        x = token_embeddings + position_embeddings
+        x = self.dropout(x)
+
+        # GPT 风格的下三角掩码
+        attn_mask = self.mask[:, :seq_len, :seq_len]
+        attn_mask = (attn_mask == 0)
+
         for layer in self.layers:
-            # 手动跳过 Cross-Attention
-            x_emb = layer(x_emb, memory=None, tgt_mask=causal_mask)
+            x = layer(x, attn_mask=attn_mask)
 
-        logits = self.fc_out(x_emb)  # (seq_len, batch, vocab_size)
-        return logits
+        x = self.ln_f(x)
+        return x
 
-    @staticmethod
-    def _generate_square_subsequent_mask(sz: int) -> torch.Tensor:
-        """生成因果掩码（防止看到未来信息）"""
-        return torch.triu(torch.full((sz, sz), float("-inf")), diagonal=1)
+
+
+def train_model(model, data_loader, optimizer, criterion, device, epochs=1):
+    model.train()  # 切换到训练模式
+    for epoch in range(epochs):
+        total_loss = 0
+        progress_bar = tqdm(data_loader, desc=f"Epoch {epoch+1}", unit="batch")
+        for batch in progress_bar:
+            input_ids, labels = batch
+            input_ids = input_ids.to(device)
+            labels = labels.to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(input_ids)
+            # 假设 labels 与 input_ids 相同，用于下一词预测
+            loss = criterion(outputs.view(-1, outputs.size(-1)), labels.view(-1))
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+            progress_bar.set_postfix(loss=loss.item())
+        avg_loss = total_loss / len(data_loader)
+        perplexity = math.exp(avg_loss)
+        print(f"Epoch {epoch+1} Loss: {avg_loss:.4f}  Perplexity: {perplexity:.4f}")
+
+def predict(model, input_ids, device, max_length=50):
+    model.eval()  # 切换到推理模式
+    input_ids = input_ids.to(device)
+    with torch.no_grad():
+        for _ in range(max_length):
+            outputs = model(input_ids)
+            # 取最后一个时间步的预测结果
+            next_token_logits = outputs[:, -1, :]
+            next_token = torch.argmax(next_token_logits, dim=-1).unsqueeze(-1)
+            input_ids = torch.cat([input_ids, next_token], dim=-1)
+    return input_ids
