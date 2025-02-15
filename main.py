@@ -138,5 +138,6 @@ if __name__ == "__main__":
     #     )
     # )
     model.to(try_gpu())
+    
     #get_predict(model)
     train(model,0)
