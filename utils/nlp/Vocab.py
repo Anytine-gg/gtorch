@@ -74,6 +74,17 @@ def load_en_books(path: str) -> list[list[str]]:
 def tokenize(books: list[str]):
     return [list(book) for book in books]
 
+def en_tokenize(text: str) -> list[str]:
+    # 定义正则表达式模式，匹配单词、标点符号和空白字符
+    pattern = re.compile(r'([.,!?;:\'\"()\-]+|\s+|\w+)')
+    
+    # 使用正则表达式分割文本
+    tokens = re.findall(pattern, text)
+    
+    # 过滤掉空字符串
+    tokens = [tk for tk in tokens if tk != '']
+    
+    return tokens
 
 class Vocab:
     def __init__(self, tokenized_books, min_freq=0):
