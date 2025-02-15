@@ -141,3 +141,5 @@ if __name__ == "__main__":
     vocab = Vocab(tokenized_books=books)
     print(vocab['that'])
     print(vocab.__len__())
+    
+    
