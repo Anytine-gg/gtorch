@@ -12,7 +12,7 @@ class LangDataset(Dataset):
             self.books = load_books(books_path)
         else:
             self.books = load_en_books(books_path)
-        self.books = tokenize(books=self.books)
+        # self.books = tokenize(books=self.books)
         self.vocab = Vocab(tokenized_books=self.books,min_freq=min_freq)
         self.seq_len = seq_len
         self.data = []

@@ -18,21 +18,22 @@ if __name__ == "__main__":
     batch_size = 256
 
     train_dataset = LangDataset(
-        books_path="/root/projs/python/mytorch/enbooks/1",
+        books_path="/root/projs/python/mytorch/enbooks/1/output",
         seq_len=seq_len,
-        min_freq=100,
+        min_freq=20,
         lang="en",
     )
-
+    
     vocab = train_dataset.vocab
-
+    
     train_loader = DataLoader(
         dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
     )   
     print(len(vocab))
+    # print(next(iter(train_loader)))
     model = myTF.GPTEncoder(
         vocab_size=len(vocab),
-        embed_dim=128,
+        embed_dim=64,
         num_heads=4,
         num_layers=2,
         max_len=512,
@@ -49,7 +50,7 @@ if __name__ == "__main__":
         try_gpu(),
         100,
         vocab=vocab,
-        prefix="to be or not to ",
+        prefix="my name is ",
         max_len=50
         )
     

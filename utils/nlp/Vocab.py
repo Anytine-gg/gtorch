@@ -47,32 +47,31 @@ def load_books(path: str) -> list[str]:
 
 
 def load_en_books(path: str) -> list[list[str]]:
-    books = []
-    # 仍旧先去除无关字符
-    pattern = re.compile(r"[^a-z\s.,!?;:'\"()\n-]")
+    import os
+    import re
+    import string
 
+    books = []
+    # 构造正则表达式模式，匹配换行符和所有标点符号
+    pattern = r'[\n' + re.escape(string.punctuation) + r']+'
+    
     for root, _, files in os.walk(path):
         for file in files:
             if file.endswith(".txt"):
                 file_path = os.path.join(root, file)
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read().lower()
-                    cleaned_content = re.sub(pattern, "", content)
-
-                    # 使用正则表达式分割，保留标点和纯空白（含换行、空格等）
-                    tokens = re.split(r'([.,!?;:\'\"()\-]+|\s+)', cleaned_content)
-                    
-                    # 仅去除空字符串（即''），保留空白符号、标点等
-                    # 如果想彻底去除空白，可改为 tk.strip() 过滤
-                    tokens = [tk for tk in tokens if tk != '']
-
+                    content = f.read()
+                    # 将换行和标点都替换为空格
+                    cleaned_content = re.sub(pattern, " ", content)
+                    # 使用正则表达式将文本分割为单词和单个空格
+                    # \S+ 匹配非空白的连续字符（单词），\s 匹配单个空白字符
+                    tokens = re.findall(r'\S+|\s', cleaned_content)
                     books.append(tokens)
-
     return books
 
 
 def tokenize(books: list[str]):
-    return [list(book) for book in books]
+    return [list(book) for book  in books]
 
 def en_tokenize(text: str) -> list[str]:
     # 定义正则表达式模式，匹配单词、标点符号和空白字符
@@ -136,10 +135,10 @@ class Vocab:
 
 
 if __name__ == "__main__":
-    books = load_en_books("/root/projs/python/mytorch/enbooks/1")
+    books = load_en_books("/root/projs/python/mytorch/enbooks/1/output")
     books = tokenize(books=books)
-    vocab = Vocab(tokenized_books=books)
-    print(vocab['that'])
+    vocab = Vocab(tokenized_books=books,min_freq=10)
+    print(vocab['announcement'])
     print(vocab.__len__())
     
     
