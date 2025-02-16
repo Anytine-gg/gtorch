@@ -46,14 +46,34 @@ def load_books(path: str) -> list[str]:
     return books
 
 
+# def load_en_books(path: str) -> list[list[str]]:
+#     import os
+#     import re
+#     import string
+
+#     books = []
+#     # 构造正则表达式模式，匹配换行符和所有标点符号
+#     pattern = r'[\n' + re.escape(string.punctuation) + r']+'
+    
+#     for root, _, files in os.walk(path):
+#         for file in files:
+#             if file.endswith(".txt"):
+#                 file_path = os.path.join(root, file)
+#                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+#                     content = f.read()
+#                     # 将换行和标点都替换为空格
+#                     cleaned_content = re.sub(pattern, " ", content)
+#                     # 使用正则表达式将文本分割为单词和单个空格
+#                     # \S+ 匹配非空白的连续字符（单词），\s 匹配单个空白字符
+#                     tokens = re.findall(r'\S+|\s', cleaned_content)
+#                     books.append(tokens)
+#     return books
 def load_en_books(path: str) -> list[list[str]]:
     import os
     import re
     import string
 
     books = []
-    # 构造正则表达式模式，匹配换行符和所有标点符号
-    pattern = r'[\n' + re.escape(string.punctuation) + r']+'
     
     for root, _, files in os.walk(path):
         for file in files:
@@ -61,14 +81,9 @@ def load_en_books(path: str) -> list[list[str]]:
                 file_path = os.path.join(root, file)
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                    # 将换行和标点都替换为空格
-                    cleaned_content = re.sub(pattern, " ", content)
-                    # 使用正则表达式将文本分割为单词和单个空格
-                    # \S+ 匹配非空白的连续字符（单词），\s 匹配单个空白字符
-                    tokens = re.findall(r'\S+|\s', cleaned_content)
+                    tokens = list(content)
                     books.append(tokens)
     return books
-
 
 def tokenize(books: list[str]):
     return [list(book) for book  in books]

@@ -15,7 +15,7 @@ import utils.models.transformer2 as myTF
 
 if __name__ == "__main__":
     seq_len = 256
-    batch_size = 64
+    batch_size = 256
 
     train_dataset = LangDataset(
         books_path="/root/projs/python/mytorch/enbooks/1/output",

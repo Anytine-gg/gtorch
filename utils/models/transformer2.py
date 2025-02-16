@@ -117,7 +117,8 @@ def train_model(
 def tokenize(text: str):
     import re
     # \w+ 匹配单词， [^\w\s] 匹配标点， [\s] 匹配空白（包括空格、换行等）
-    tokens = re.findall(r'\w+|[^\w\s]|[\s]', text)
+    # tokens = re.findall(r'\w+|[^\w\s]|[\s]', text)
+    tokens = list(text)
     return tokens
 
 def predict_str(model, prefix: str, vocab: Vocab, device, max_length=50):
