@@ -14,7 +14,7 @@ import utils.models.transformer2 as myTF
 
 
 if __name__ == "__main__":
-    seq_len = 64
+    seq_len = 32
     batch_size = 256
 
     train_dataset = LangDataset(
@@ -35,7 +35,7 @@ if __name__ == "__main__":
         vocab_size=len(vocab),
         embed_dim=128,
         num_heads=4,
-        num_layers=2,
+        num_layers=3,
         max_len=512,
         dropout=0.1,
     )
