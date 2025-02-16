@@ -14,8 +14,8 @@ import utils.models.transformer2 as myTF
 
 
 if __name__ == "__main__":
-    seq_len = 16
-    batch_size = 16
+    seq_len = 64
+    batch_size = 256
 
     train_dataset = LangDataset(
         books_path="/root/projs/python/mytorch/enbooks/1",
@@ -28,11 +28,11 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(
         dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4
-    )
-
+    )   
+    print(len(vocab))
     model = myTF.GPTEncoder(
         vocab_size=len(vocab),
-        embed_dim=64,
+        embed_dim=128,
         num_heads=4,
         num_layers=2,
         max_len=512,
@@ -47,6 +47,9 @@ if __name__ == "__main__":
         optim,
         nn.CrossEntropyLoss(),
         try_gpu(),
-        10
+        100,
+        vocab=vocab,
+        prefix="to be or not to ",
+        max_len=50
         )
     
