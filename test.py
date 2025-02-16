@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # print(next(iter(train_loader)))
     model = myTF.GPTEncoder(
         vocab_size=len(vocab),
-        embed_dim=64,
+        embed_dim=128,
         num_heads=4,
         num_layers=2,
         max_len=512,
