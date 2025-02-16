@@ -14,13 +14,13 @@ import utils.models.transformer2 as myTF
 
 
 if __name__ == "__main__":
-    seq_len = 32
-    batch_size = 256
+    seq_len = 256
+    batch_size = 64
 
     train_dataset = LangDataset(
         books_path="/root/projs/python/mytorch/enbooks/1/output",
         seq_len=seq_len,
-        min_freq=20,
+        min_freq=30,
         lang="en",
     )
     

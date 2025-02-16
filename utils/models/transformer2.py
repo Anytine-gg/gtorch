@@ -95,6 +95,7 @@ def train_model(
 
             optimizer.zero_grad()
             outputs = model(input_ids)
+            
             # 假设 labels 与 input_ids 相同，用于下一词预测
             loss = criterion(outputs.view(-1, outputs.size(-1)), labels.view(-1))
             loss.backward()
