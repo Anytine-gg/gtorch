@@ -7,7 +7,7 @@ from utils.cv.detection.VOCDataloader import get_voc_dataloaders
 
 
 train_dataset, train_loader, val_dataset, val_loader = get_voc_dataloaders(
-    batch_size=16, num_workers=4
+    batch_size=1, num_workers=4
 )
 
 
