@@ -7,6 +7,8 @@ from torchvision import transforms
 from torchvision.datasets import VOCDetection
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
+from albumentations.pytorch import ToTensorV2
+import albumentations as A
 
 
 class MyVOCDataset(Dataset):
@@ -24,21 +26,26 @@ class MyVOCDataset(Dataset):
     def __getitem__(self, index):
         image, target = self.voc_dataset[index]
         objects = target["annotation"]["object"]
-        labels = [obj['name'] for obj in objects]
+        labels = [obj["name"] for obj in objects]
         if isinstance(objects, dict):
             objects = [objects]
-        
+
         def get_bbox(obj):
-            box = obj['bndbox']
-            return [int(box['xmin']), int(box['ymin']), int(box['xmax']), int(box['ymax'])]
+            box = obj["bndbox"]
+            return [
+                int(box["xmin"]),
+                int(box["ymin"]),
+                int(box["xmax"]),
+                int(box["ymax"]),
+            ]
+
         bboxes = [get_bbox(obj) for obj in objects]
         if self.transform:
-            augmented = self.transform(image=image,bboxes=bboxes)
-            image = augmented['image']
-            bboxes = augmented['bboxes']
-            
-        return image,bboxes,labels
-    
+            augmented = self.transform(image=image, bboxes=bboxes)
+            image = augmented["image"]
+            bboxes = augmented["bboxes"]
+
+        return image, bboxes, labels
 
     def __len__(self):
         return len(self.voc_dataset)
@@ -47,7 +54,7 @@ class MyVOCDataset(Dataset):
 def get_voc_dataloaders(
     data_dir="./data", batch_size=1, num_workers=4, split_ratio=0.8
 ):
-    """ 
+    """
     加载2007 VOC数据集，并划分为训练集和验证集。
 
     参数:
@@ -58,19 +65,14 @@ def get_voc_dataloaders(
     返回:
         train_dataset, train_loader, val_dataset, val_loader
     """
-    transform = transforms.Compose(
-        [
-            transforms.Resize((300, 300)),
-            transforms.ToTensor(),
-        ]
+    transform = A.Compose(
+        [ToTensorV2()],
+        bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
 
     # 加载 VOC2007 数据集，采用 trainval 模式
-    voc_dataset = VOCDetection(
-        root=data_dir,
-        year="2007",
-        image_set="trainval",
-        download=False,
+    voc_dataset = MyVOCDataset(
+        data_dir=data_dir,
         transform=transform,
     )
 
@@ -80,14 +82,20 @@ def get_voc_dataloaders(
 
     # 划分训练集和验证集
     train_dataset, val_dataset = torch.utils.data.random_split(
-        voc_dataset, [train_size, val_size]
+        dataset=voc_dataset, lengths=[train_size, val_size]
     )
 
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        dataset=train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+        dataset=val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
     )
 
     return train_dataset, train_loader, val_dataset, val_loader
@@ -109,4 +117,5 @@ if __name__ == "__main__":
     # plt.title("VOC Image")
     # plt.show()
     dataset = MyVOCDataset("./data", None)
-    print(dataset[0])
+    image,bboxes,labels = dataset[0]
+     
