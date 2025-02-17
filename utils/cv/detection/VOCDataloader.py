@@ -47,7 +47,7 @@ class MyVOCDataset(Dataset):
 def get_voc_dataloaders(
     data_dir="./data", batch_size=1, num_workers=4, split_ratio=0.8
 ):
-    """
+    """ 
     加载2007 VOC数据集，并划分为训练集和验证集。
 
     参数:
