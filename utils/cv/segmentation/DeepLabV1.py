@@ -5,10 +5,10 @@ from torch import nn
 import torchsummary
 import torchvision
 import torchvision.models as models
-from AtrousConv import AtrousConv
+from utils.cv.segmentation.AtrousConv import AtrousConv
 import torch.nn.functional as F
 
-class VGG16_LargeFOV(nn.Module):
+class DeepLabV1(nn.Module):
     def __init__(self,out_channels,dropout=0.1):
         super().__init__()
         vgg = models.vgg16(pretrained=False)
@@ -38,10 +38,13 @@ class VGG16_LargeFOV(nn.Module):
         x = F.relu(self.conv(x))
         x = self.dropout2(x)
         x = self.classify(x)
+        x = F.interpolate(x, scale_factor=8, mode='bilinear', align_corners=False)  # 上采样到原图
+        return x
         
         
 if __name__ == "__main__":
-    model = VGG16_LargeFOV(16)
-    img = torch.rand(3,224,224)
-    torchsummary.summary(model,(3,224,224))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = DeepLabV1(16).to(device)
+    img = torch.rand(1,3,224,224).to(device)
+    print(model(img).shape)
     

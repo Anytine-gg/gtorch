@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 from torchvision import transforms
-from torchvision.datasets import VOCDetection
+from torchvision.datasets import VOCDetection, VOCSegmentation
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from albumentations.pytorch import ToTensorV2
@@ -57,7 +57,7 @@ def plot(image, bboxes, labels):
     plt.show()
 
 
-class MyVOCDataset(Dataset):
+class VOCDetection_(Dataset):
     def __init__(self, data_dir, transform=None):
         super().__init__()
         self.transform = transform
@@ -98,7 +98,44 @@ class MyVOCDataset(Dataset):
     def __len__(self):
         return len(self.voc_dataset)
 
+def getVOCSegDataset(data_dir="./data", batch_size=4, num_workers=4):
+    # 图像转换：转为 tensor 并归一化
+    img_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    # 分割标注转换：将标注转换为 numpy 数组，再转为 long 类型 tensor
+    def target_transform(target):
+        # target 本身为 PIL Image, 数值范围通常为 0~255，因此直接转换为 int 类别
+        target = transforms.ToTensor()(target)
+        # ToTensor 之后 target 形状为 (1, H, W)，将其转换为 (H, W) 的 long tensor
+        target = torch.squeeze(target, 0)
+        return (target * 255).long()
 
+    # 构建训练集（VOCSegmentation 要求数据集目录符合VOC格式）
+    train_dataset = VOCSegmentation(
+        root=data_dir,
+        year="2012",
+        image_set="train",
+        download=True,
+        transform=img_transform,
+        target_transform=target_transform
+    )
+    # 构建验证集
+    val_dataset = VOCSegmentation(
+        root=data_dir,
+        year="2012",
+        image_set="val",
+        download=True,
+        transform=img_transform,
+        target_transform=target_transform
+    )
+
+    # 构建 DataLoader
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    return train_dataset, train_loader, val_dataset, val_loader
 
 if __name__ == "__main__":
     # train_dataset, train_loader, val_dataset, val_loader = get_voc_dataloaders()
@@ -126,7 +163,7 @@ if __name__ == "__main__":
         ],
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
-    dataset = MyVOCDataset("./data", transform)
+    dataset = VOCDetection_("./data", transform)
     image, bboxes, labels = dataset[0]
 
     plot(image, bboxes, labels)
