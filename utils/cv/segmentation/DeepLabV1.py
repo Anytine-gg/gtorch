@@ -48,3 +48,5 @@ if __name__ == "__main__":
     img = torch.rand(1,3,224,224).to(device)
     print(model(img).shape)
     
+    
+    
