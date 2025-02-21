@@ -5,14 +5,21 @@ import torch.nn.functional as F
 
 class AtrousConv(nn.Module):
     def __init__(
-        self, in_channels, out_channels, kernel_size, stride=1, padding=None, dilation=1
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=None,
+        dilation=1,
+        bias=True,
     ):
         super(AtrousConv, self).__init__()
-        if padding is None:    # 自动计算大小输入输出不变
-            padding = kernel_size+(dilation-1)*(kernel_size-1)-1
+        if padding is None:  # 自动计算大小输入输出不变
+            padding = kernel_size + (dilation - 1) * (kernel_size - 1) - 1
             padding //= 2
         self.conv = nn.Conv2d(
-            in_channels, out_channels, kernel_size, stride, padding, dilation
+            in_channels, out_channels, kernel_size, stride, padding, dilation, bias=bias
         )
 
     def forward(self, x):
