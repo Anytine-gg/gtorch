@@ -126,11 +126,12 @@ class Attention_Unet_Vgg(nn.Module):
 
         results = self.cls_conv(up_512)
 
-        argmax = torch.argmax(results, dim=1)
-        if self.training:
-            return results, argmax
-        else:
-            return argmax
+        # argmax = torch.argmax(results, dim=1)
+        return results
+        # if self.training:
+        #     return results, argmax
+        # else:
+        #     return argmax
 
 
 if __name__ == "__main__":
