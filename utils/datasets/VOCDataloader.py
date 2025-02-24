@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 from albumentations.pytorch import ToTensorV2
 import albumentations as A
 import cv2
+from VOCDetection_ import VOCDetection_
 
 
-def plot(image, bboxes, labels):
+def plot_bbox(image, bboxes, labels):
     # 如果 image 是 torch.Tensor，则转换为 numpy 数组
     if hasattr(image, "detach"):
         image = image.detach().cpu().numpy()
@@ -57,107 +58,47 @@ def plot(image, bboxes, labels):
     plt.show()
 
 
-class VOCDetection_(Dataset):
-    def __init__(self, data_dir, transform=None):
-        super().__init__()
-        self.transform = transform
-        self.voc_dataset = VOCDetection(
-            root=data_dir,
-            year="2007",
-            image_set="trainval",
-            download=False,
-            transform=None,
-        )
+def plot_img_seg(image, label):
+    # 如果 image 是 torch.Tensor，则转为 numpy 且调整通道顺序（如果是 [C,H,W]）
+    if isinstance(image, torch.Tensor):
+        image = image.cpu().detach().numpy()
+        if image.ndim == 3 and image.shape[0] == 3:
+            image = image.transpose(1, 2, 0)
 
-    def __getitem__(self, index):
-        image, target = self.voc_dataset[index]
-        image = np.array(image)
-        objects = target["annotation"]["object"]
-        labels = [obj["name"] for obj in objects]
-        if isinstance(objects, dict):
-            objects = [objects]
+    # 如果 label 是 torch.Tensor，则转为 numpy；如果 shape 为[1,H,W]则去除 channel 维度
+    if isinstance(label, torch.Tensor):
+        label = label.cpu().detach().numpy()
+        if label.ndim == 3 and label.shape[0] == 1:
+            label = label.squeeze(0)
 
-        def get_bbox(obj):
-            box = obj["bndbox"]
-            return [
-                int(box["xmin"]),
-                int(box["ymin"]),
-                int(box["xmax"]),
-                int(box["ymax"]),
-            ]
+    # 绘制图像和掩码
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    axs[0].imshow(image)
 
-        bboxes = [get_bbox(obj) for obj in objects]
-        if self.transform:
-            augmented = self.transform(image=image, bboxes=bboxes, labels=labels)
-            image = augmented["image"]
-            bboxes = augmented["bboxes"]
-            labels = augmented["labels"]
+    axs[0].axis("off")
 
-        return image, bboxes, labels
+    axs[1].imshow(label, cmap="jet")
 
-    def __len__(self):
-        return len(self.voc_dataset)
+    axs[1].axis("off")
 
-def getVOCSegDataset(data_dir="./data", batch_size=4, num_workers=4):
-    # 图像转换：转为 tensor 并归一化
-    img_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ])
-    # 分割标注转换：将标注转换为 numpy 数组，再转为 long 类型 tensor
-    def target_transform(target):
-        # target 本身为 PIL Image, 数值范围通常为 0~255，因此直接转换为 int 类别
-        target = transforms.ToTensor()(target)
-        # ToTensor 之后 target 形状为 (1, H, W)，将其转换为 (H, W) 的 long tensor
-        target = torch.squeeze(target, 0)
-        return (target * 255).long()
+    plt.show()
 
-    # 构建训练集（VOCSegmentation 要求数据集目录符合VOC格式）
-    train_dataset = VOCSegmentation(
-        root=data_dir,
-        year="2012",
-        image_set="train",
-        download=True,
-        transform=img_transform,
-        target_transform=target_transform
-    )
-    # 构建验证集
-    val_dataset = VOCSegmentation(
-        root=data_dir,
-        year="2012",
-        image_set="val",
-        download=True,
-        transform=img_transform,
-        target_transform=target_transform
-    )
 
-    # 构建 DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+def getVOCSeg(dir, train_transform, val_transform):
+    pass
 
-    return train_dataset, train_loader, val_dataset, val_loader
 
-if __name__ == "__main__":
-    # train_dataset, train_loader, val_dataset, val_loader = get_voc_dataloaders()
-    # print("训练集大小:", len(train_dataset))
-    # print("验证集大小:", len(val_dataset))
-    # images, targets = next(iter(train_loader))
-    # # 选取第一张图片, images 的形状为 (batch_size, C, H, W)
-    # img = images[0]
-    # # 将 tensor 转换为 numpy 数组, 同时将通道维从 C,H,W 转换为 H,W,C
-    # img_np = img.permute(1, 2, 0).numpy()
-    # print(targets)
-    # # 显示图片
-    # plt.imshow(img_np)
-    # plt.axis("off")
-    # plt.title("VOC Image")
-    # plt.show()
+def detectionDemo():
+    # 目标检测用例，加入bbox_params可以使得bbox也跟着变化
     transform = A.Compose(
         [
             A.RandomCrop(width=256, height=256),
             A.LongestMaxSize(max_size=512),
             A.PadIfNeeded(
-                min_height=512, min_width=512, border_mode=cv2.BORDER_CONSTANT, value=128
+                min_height=512,
+                min_width=512,
+                border_mode=cv2.BORDER_CONSTANT,
+                value=128,
             ),
             ToTensorV2(),
         ],
@@ -165,5 +106,25 @@ if __name__ == "__main__":
     )
     dataset = VOCDetection_("./data", transform)
     image, bboxes, labels = dataset[0]
+    plot_bbox(image, bboxes, labels)
 
-    plot(image, bboxes, labels)
+
+def SegmentationDemo():
+    voc_dataset = VOCSegmentation(
+        root="./data",
+        year="2012",
+        image_set="train",
+        download=False,
+        transform=transforms.ToTensor(),
+        target_transform=None,
+    )
+    image, label = voc_dataset[0]
+    np.set_printoptions(threshold=np.inf)
+
+    print(np.array(label).shape)
+    plot_img_seg(image,label)
+
+    
+
+if __name__ == "__main__":
+    SegmentationDemo()
