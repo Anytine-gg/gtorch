@@ -8,40 +8,40 @@ import torch.nn.functional as F
 
 
 class ASPP(nn.Module):
-    def __init__(self, in_channels, out_channels, dilations = [6,12,18],dropout=0.1):
+    def __init__(self, in_channels, out_channels, dilations=[6, 12, 18], dropout=0.1):
         super().__init__()
         self.path1 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.path2 = nn.Sequential(
             # kernel size 3, stride 1 dilation 12 padding: auto(None)
             AtrousConv(in_channels, out_channels, 3, 1, None, dilations[0], bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.path3 = nn.Sequential(
             AtrousConv(in_channels, out_channels, 3, 1, None, dilations[1], bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.path4 = nn.Sequential(
             AtrousConv(in_channels, out_channels, 3, 1, None, dilations[2], bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
         self.path5 = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(),
-            nn.Upsample(size=(60, 60), mode="bilinear", align_corners=True),
+            nn.ReLU(inplace=True),
+            # 需要动态upsample
         )
         self.conv = nn.Conv2d(out_channels * 5, out_channels, 1)
         self.bn = nn.BatchNorm2d(out_channels)
         self.dropout = nn.Dropout(dropout)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out1 = self.path1(x)
@@ -49,6 +49,9 @@ class ASPP(nn.Module):
         out3 = self.path3(x)
         out4 = self.path4(x)
         out5 = self.path5(x)
+        size = out1.shape[2:]
+        out5 = F.interpolate(out5, size=size, mode="bilinear", align_corners=True)
+
         output = torch.concat([out1, out2, out3, out4, out5], dim=1)
         output = self.bn(self.conv(output))
         output = self.dropout(self.relu(output))
@@ -56,11 +59,16 @@ class ASPP(nn.Module):
 
 
 class DeepLabV3(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, out_channels):
         super().__init__()
         backbone = torchvision.models.resnet50(
-            replace_stride_with_dilation=[False, True, True]
+            replace_stride_with_dilation=[
+                False,
+                True,
+                True,
+            ]  # 改动layer3 layer4为空洞卷积(不下采样)
         )
+        backbone.conv1
         self.layer0 = nn.Sequential(
             backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool
         )
@@ -68,11 +76,11 @@ class DeepLabV3(nn.Module):
         self.layer2 = backbone.layer2
         self.layer3 = backbone.layer3
         self.layer4 = backbone.layer4
-        self.aspp = ASPP(2048, 256,[12,24,36])
-        self.conv = nn.Conv2d(256, 256, 3, padding=1)
+        self.aspp = ASPP(2048, 256, [12, 24, 36])
+        self.conv = nn.Conv2d(256, 256, 3, padding=1, bias=False)
         self.bn = nn.BatchNorm2d(256)
         self.proj = nn.Conv2d(256, out_channels, 1)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
         self.upsample = nn.Upsample(scale_factor=8, mode="bilinear", align_corners=True)
 
     def forward(self, x):
@@ -91,5 +99,5 @@ class DeepLabV3(nn.Module):
 
 
 if __name__ == "__main__":
-    model = DeepLabV3(3, 3)
+    model = DeepLabV3(3)
     torchsummary.summary(model, (3, 480, 480), -1, "cpu")
