@@ -5,8 +5,7 @@ import torchsummary
 import torchvision
 from AtrousConv import AtrousConv
 import torch.nn.functional as F
-from utils.cv.segmentation.ASPP import ASPP
-
+from ASPP import ASPP
 
 
 class DeepLabV3(nn.Module):

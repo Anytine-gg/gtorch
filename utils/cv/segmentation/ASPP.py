@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from utils.cv.segmentation.AtrousConv import AtrousConv
+from . import AtrousConv
 import torch.nn.functional as F
 class ASPP(nn.Module):
     def __init__(self, in_channels, out_channels, dilations=[6, 12, 18], dropout=0.1):
