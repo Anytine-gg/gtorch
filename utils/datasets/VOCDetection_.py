@@ -5,13 +5,13 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 
 
-# 不分train和val，用split分
+# 2007不分train和val，用split分
 class VOCDetection_(Dataset):
     def __init__(
         self,
         data_dir,
         year="2012",
-        image_set="trainval",
+        image_set="train",
         download=False,
         transform=None,
     ):
@@ -48,7 +48,7 @@ class VOCDetection_(Dataset):
             image = augmented["image"]
             bboxes = augmented["bboxes"]
             labels = augmented["labels"]
-
+        
         return image, bboxes, labels
 
     def __len__(self):

@@ -3,7 +3,7 @@ from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from torch.utils.data import random_split, DataLoader
-from utils.datasets.VOCDataloader import get_voc_dataloaders
+from utils.datasets.VOCLoaders import get_voc_dataloaders
 
 
 train_dataset, train_loader, val_dataset, val_loader = get_voc_dataloaders(

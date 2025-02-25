@@ -92,7 +92,7 @@ def detectionDemo():
     # 目标检测用例，加入bbox_params可以使得bbox也跟着变化
     transform = A.Compose(
         [
-            A.RandomCrop(width=256, height=256),
+            #A.RandomCrop(width=256, height=256),
             A.LongestMaxSize(max_size=512),
             A.PadIfNeeded(
                 min_height=512,
@@ -104,8 +104,11 @@ def detectionDemo():
         ],
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
-    dataset = VOCDetection_("./data", transform)
+    dataset = VOCDetection_(
+        './data',transform=transform
+    )
     image, bboxes, labels = dataset[0]
+    print(labels)
     plot_bbox(image, bboxes, labels)
 
 
@@ -127,4 +130,4 @@ def SegmentationDemo():
     
 
 if __name__ == "__main__":
-    SegmentationDemo()
+    detectionDemo()
