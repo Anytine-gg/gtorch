@@ -2,12 +2,11 @@ from turtle import forward
 from matplotlib.pyplot import cla
 import torch
 from torch import nn
-import torchsummary
 import torchvision
 from AtrousConv import AtrousConv
 import torch.nn.functional as F
 from DeepLabV3 import ASPP
-
+from utils.cv.segmentation.ASPP import ASPP
 
 class DeepLabEncoder(nn.Module):
     def __init__(self):
