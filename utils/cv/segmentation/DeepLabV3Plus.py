@@ -6,11 +6,13 @@ import torch.nn.functional as F
 from DeepLabV3 import ASPP
 from ASPP import ASPP
 
+
 class DeepLabEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained=False):
         super().__init__()
         backbone = torchvision.models.resnet50(
-            replace_stride_with_dilation=[False, False, True]  # 仅改动layer4为空洞卷积
+            replace_stride_with_dilation=[False, False, True],  # 仅改动layer4为空洞卷积
+            pretrained=pretrained,
         )
         self.layer0 = nn.Sequential(
             backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool
@@ -55,20 +57,24 @@ class DeepLabDecoder(nn.Module):
         output = self.output(output)
         return output
 
+
 class DeepLabV3Plus(nn.Module):
-    def __init__(self,out_channels):
+    def __init__(self, out_channels, pretrained=False):
         super().__init__()
-        self.encoder = DeepLabEncoder()
+        self.encoder = DeepLabEncoder(pretrained=pretrained)
         self.decoder = DeepLabDecoder(out_channels)
-    def forward(self,x):
-        x,y = self.encoder(x)
-        output = self.decoder(x,y)
-        output = F.interpolate(output, scale_factor=4, mode='bilinear', align_corners=True)
+
+    def forward(self, x):
+        x, y = self.encoder(x)
+        output = self.decoder(x, y)
+        output = F.interpolate(
+            output, scale_factor=4, mode="bilinear", align_corners=True
+        )
         return output
 
-        
+
 if __name__ == "__main__":
     model = DeepLabV3Plus(5)
-    tensor = torch.randn(2,3,480,480)
+    tensor = torch.randn(2, 3, 480, 480)
     print(model(tensor).shape)
-    #torchsummary.summary(model, (3, 480, 480), -1, "cpu")
+    # torchsummary.summary(model, (3, 480, 480), -1, "cpu")

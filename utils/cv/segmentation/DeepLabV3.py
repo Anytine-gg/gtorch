@@ -9,14 +9,15 @@ from ASPP import ASPP
 
 
 class DeepLabV3(nn.Module):
-    def __init__(self, out_channels):
+    def __init__(self, out_channels, pretrained=False):
         super().__init__()
         backbone = torchvision.models.resnet50(
             replace_stride_with_dilation=[
                 False,
                 True,
                 True,
-            ]  # 改动layer3 layer4为空洞卷积(不下采样)
+            ],  # 改动layer3 layer4为空洞卷积(不下采样)
+            pretrained=pretrained,
         )
         backbone.conv1
         self.layer0 = nn.Sequential(
