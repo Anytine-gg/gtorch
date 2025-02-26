@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from albumentations.pytorch import ToTensorV2
 import albumentations as A
 import cv2
-from VOCDetection_ import VOCDetection_
+from gtorch.utils.datasets.VOCDetection_ import VOCDetection_
 
 
 def plot_bbox(image, bboxes, labels):
