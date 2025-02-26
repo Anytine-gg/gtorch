@@ -37,7 +37,7 @@ def detectionDemo():
     )
     image, bboxes, labels = dataset[0]
     print(labels)
-    plot_bbox(image, bboxes, labels)
+    # plot_bbox(image, bboxes, labels)
 
 
 def SegmentationDemo():

@@ -1,7 +1,7 @@
 import random
 import torch
 from torch.utils.data import Dataset
-from ..nlp.Vocab import Vocab, load_books, tokenize, load_en_books
+from gtorch.nlp.Vocab import Vocab, load_books, tokenize, load_en_books
 import numpy as np
 
 

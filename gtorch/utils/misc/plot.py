@@ -50,7 +50,7 @@ def plot_bbox(image, bboxes, labels):
     plt.show()
 
 
-def plot_img_seg(image, label):
+def plot_seg(image, label):
     # 如果 image 是 torch.Tensor，则转为 numpy 且调整通道顺序（如果是 [C,H,W]）
     if isinstance(image, torch.Tensor):
         image = image.cpu().detach().numpy()

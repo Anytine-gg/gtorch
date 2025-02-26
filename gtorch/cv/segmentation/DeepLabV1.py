@@ -5,9 +5,9 @@ from gtorch.cv.segmentation.AtrousConv import AtrousConv
 import torch.nn.functional as F
 
 class DeepLabV1(nn.Module):
-    def __init__(self,out_channels,dropout=0.1):
+    def __init__(self,out_channels,dropout=0.1,pretrained=False):
         super().__init__()
-        vgg = models.vgg16(pretrained=False)
+        vgg = models.vgg16(pretrained=pretrained)
         features = vgg.features
         features[4] = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         features[9] = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-from .VOCDetection_ import VOCDetection_
+from gtorch.utils.datasets.VOCDetection_ import VOCDetection_
 
 
 class YOLOv3_VOCDataset(Dataset):
@@ -19,7 +19,6 @@ class YOLOv3_VOCDataset(Dataset):
 
     def __getitem__(self, index):
         image, bboxes, labels = self.voc_dataset[index]
-        img_shape = image.shape
-        
+        return image,bboxes,labels
     def __len__(self):
         pass
