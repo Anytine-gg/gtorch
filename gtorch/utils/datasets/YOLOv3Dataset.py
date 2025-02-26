@@ -42,10 +42,11 @@ class YOLOv3_Dataset(Dataset):
         bboxes[:, 1] = (bboxes[:, 1] + bboxes[:, 3]) / 2
         bboxes[:, 2] = width
         bboxes[:, 3] = height
-        # 生成锚框的位置矩阵，shape为(9,4), repeat成(num_of_bboxes,9,4)
+        # 生成锚框的位置矩阵，shape为(9*num_of_bboxes,4), 
         anchors = torch.tensor(self.anchors).float().reshape(9, 2) 
         anchors = torch.cat([torch.zeros(9, 2), anchors], dim=1)
-        anchors = anchors.unsqueeze(0).repeat(num_of_bboxes,1,1) 
+        anchors = anchors.repeat(num_of_bboxes,1)
+        
         
         cx = bboxes[:,0]
         cy = bboxes[:,1]
