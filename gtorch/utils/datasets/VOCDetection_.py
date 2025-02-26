@@ -9,7 +9,7 @@ import numpy as np
 class VOCDetection_(Dataset):
     def __init__(
         self,
-        data_dir,
+        data_dir='./data',
         year="2012",
         image_set="train",
         download=False,
