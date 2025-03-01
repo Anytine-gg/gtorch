@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class Bottleneck(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, proj=False):
+    def __init__(self, in_channels, out_channels, stride=1, proj=False,act_fn='leakyrelu'):
         super().__init__()
         mid_channels = out_channels // 4
         self.conv1 = nn.Conv2d(in_channels, mid_channels, 1, bias=False)
@@ -17,7 +17,10 @@ class Bottleneck(nn.Module):
         if proj:
             self.proj_conv = nn.Conv2d(in_channels,out_channels,1,stride=stride,bias=False)
             self.proj_bn = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
+        if act_fn == 'leakyrelu':    
+            self.relu = nn.LeakyReLU(inplace=True)
+        else:
+            self.relu = act_fn
         self.proj = proj
     def forward(self,x):
         y = self.relu(self.bn1(self.conv1(x)))
