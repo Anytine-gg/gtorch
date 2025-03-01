@@ -1,11 +1,13 @@
-import torch
-import torch.nn.functional as F
-from torch.utils.data import Dataset
-from gtorch.cv.detection.tools import calc_IoU_tensor
-from gtorch.utils.datasets.VOCDetection_ import VOCDetection_, voc2012_labels
 import albumentations as A
 import cv2
+import torch
+import torch.nn.functional as F
 from albumentations.pytorch import ToTensorV2
+from torch.utils.data import Dataset
+
+from gtorch.cv.detection.tools import calc_IoU_tensor,yolo3_loss
+from gtorch.utils.datasets.VOCDetection_ import VOCDetection_, voc2012_labels
+
 
 class YOLOv3_Dataset(Dataset):
     def __init__(
@@ -84,7 +86,7 @@ class YOLOv3_Dataset(Dataset):
         # 生成一个bboxes_idx_iou tensor,每一行是一个bbox的cx,cy,w,h,idx,iou.
         # idx是负责预测的anchor的idx,iou是最大的iou. 在iou处排序,确保最大的在前,避免一个anchor预测多个bbox
         bboxes_idx_iou = torch.cat(
-            [bboxes_origin, argmax.unsqueeze(1), max_iou.unsqueeze(1)],
+            [bboxes_origin, argmax.unsqueeze(1), max_iou.unsqueeze(1),labels.unsqueeze(1)],
             dim=1,
         )
         sorted_indices = torch.argsort(bboxes_idx_iou[:, 5], dim=0, descending=True)
@@ -112,9 +114,12 @@ class YOLOv3_Dataset(Dataset):
             txty = torch.logit(gt_pos / stride - cxcy)
             twth = torch.log(gt_size * stride / anchor_size)
             conf = 1
+            label = bboxes_idx_iou[i,6].long()
             feat_map[anchor_idx // 3][step:step+2, cx, cy] =txty  
             feat_map[anchor_idx // 3][step+2:step+4, cx, cy] = twth 
             feat_map[anchor_idx // 3][step+4, cx, cy] = conf 
+            feat_map[anchor_idx // 3][step+label,cx,cy] = 1
+            
         # feat_map1,2,3的尺寸分别是52,26,13(检测小，中，大物体)
         return image,feat_map1,feat_map2,feat_map3
 
@@ -141,4 +146,5 @@ if __name__ == "__main__":
 
     dataset = VOCDetection_(transform=transform)
     dataset = YOLOv3_Dataset(20, dataset,device='cuda')
-    
+    pred_feat = torch.randn(1, 75, 52, 52).to('cuda')
+    print(yolo3_loss(pred_feat,dataset[1][1].unsqueeze(0)))

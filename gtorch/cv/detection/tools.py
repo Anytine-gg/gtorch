@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 def calc_IoU(box1, box2):
     """
@@ -73,3 +74,62 @@ def calc_IoU_tensor(bboxes, anchors):
     union_area = bboxes_area + anchors_area - inter_area
     iou = inter_area / union_area
     return iou
+
+
+
+def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
+    # predict_feat和label_feat形状：(b, c, h, w)
+    # c = 3 * (5 + num_classes)
+    num_anchors = 3
+    b, c, h, w = predict_feat.shape
+    num_classes = c // num_anchors - 5
+
+    # 重构为 (b, 3, 5+num_classes, h, w)
+    pred = predict_feat.view(b, num_anchors, 5 + num_classes, h, w)
+    label = label_feat.view(b, num_anchors, 5 + num_classes, h, w)
+
+    # 分离各部分：
+    # 回归部分：tx,ty,tw,th 对应索引 0:4
+    pred_reg = pred[:, :, 0:4, :, :]
+    label_reg = label[:, :, 0:4, :, :]
+    
+    # 置信度：index 4
+    pred_conf = pred[:, :, 4, :, :]
+    label_conf = label[:, :, 4, :, :]
+    
+    # 分类部分：index 5:
+    pred_cls = pred[:, :, 5:, :, :]
+    label_cls = label[:, :, 5:, :, :]
+
+    # 构造正样本 mask：只有当 label_conf==1 的地方，才计算回归和分类loss
+    pos_mask = label_conf == 1  # 形状: (b, 3, h, w)
+
+    # 1. 回归loss（仅对正样本计算），使用均方误差
+    if pos_mask.sum() > 0:
+        # 扩展mask，使得可以作用在回归通道上
+        pos_mask_reg = pos_mask.unsqueeze(2).expand_as(pred_reg)
+        reg_loss = F.mse_loss(pred_reg[pos_mask_reg], label_reg[pos_mask_reg], reduction='sum')
+    else:
+        reg_loss = torch.tensor(0., device=predict_feat.device)
+
+    # 2. 置信度loss，对所有区域使用二元交叉熵（这里直接用 BCEWithLogitsLoss，不需要手动sigmoid）
+    conf_loss = F.binary_cross_entropy_with_logits(pred_conf, label_conf, reduction='sum')
+
+    # 3. 分类loss，仅对正样本计算。这里题目要求先对每个类别通道做sigmoid，再与标签（独热编码）做 BCE
+    if pos_mask.sum() > 0:
+        pos_mask_cls = pos_mask.unsqueeze(2).expand_as(pred_cls)
+        # 对预测的类别做sigmoid
+        pred_cls_sig = torch.sigmoid(pred_cls)
+        cls_loss = F.binary_cross_entropy(pred_cls_sig[pos_mask_cls],
+                                          label_cls[pos_mask_cls],
+                                          reduction='sum')
+    else:
+        cls_loss = torch.tensor(0., device=predict_feat.device)
+
+    total_loss = reg_loss + conf_loss + cls_loss
+    return total_loss
+
+
+
+if __name__ == '__main__':
+   pass
