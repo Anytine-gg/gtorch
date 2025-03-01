@@ -1,20 +1,11 @@
-from ast import arg
-from matplotlib.pyplot import grid
-from networkx import center
-from numpy import arange
-from sympy import im
 import torch
-from torch import long, nn, tensor
 import torch.nn.functional as F
 from torch.utils.data import Dataset
-from zmq import device
 from gtorch.cv.detection.tools import calc_IoU_tensor
 from gtorch.utils.datasets.VOCDetection_ import VOCDetection_, voc2012_labels
 import albumentations as A
 import cv2
 from albumentations.pytorch import ToTensorV2
-from gtorch.utils.misc.plot import plot_bbox
-
 
 class YOLOv3_Dataset(Dataset):
     def __init__(
