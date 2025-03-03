@@ -19,13 +19,12 @@ class YOLOv3_Dataset(Dataset):
             [(30, 61), (62, 45), (59, 119)],
             [(116, 90), (156, 198), (373, 326)],
         ],
-        device='cpu'
     ):
         super().__init__()
         self.dataset = dataset
         self.anchors = anchors
         self.num_of_classes = num_of_classes
-        self.device = 'cpu' if device is None else device
+        self.device = 'cpu'  #cuda无法用于多线程
 
     def __getitem__(self, index):
         image, bboxes, labels = self.dataset[index]
@@ -118,7 +117,7 @@ class YOLOv3_Dataset(Dataset):
             feat_map[anchor_idx // 3][step:step+2, cx, cy] =txty  
             feat_map[anchor_idx // 3][step+2:step+4, cx, cy] = twth 
             feat_map[anchor_idx // 3][step+4, cx, cy] = conf 
-            feat_map[anchor_idx // 3][step+label,cx,cy] = 1
+            feat_map[anchor_idx // 3][step+5+label,cx,cy] = 1
             
         # feat_map1,2,3的尺寸分别是52,26,13(检测小，中，大物体)
         return image,feat_map1,feat_map2,feat_map3
@@ -145,6 +144,7 @@ if __name__ == "__main__":
     )
 
     dataset = VOCDetection_(transform=transform)
-    dataset = YOLOv3_Dataset(20, dataset,device='cuda')
-    pred_feat = torch.randn(1, 75, 52, 52).to('cuda')
+    dataset = YOLOv3_Dataset(20, dataset)
+    pred_feat = torch.randn(1, 75, 52, 52)
+    print(dataset[1][1].unsqueeze(0).shape)
     print(yolo3_loss(pred_feat,dataset[1][1].unsqueeze(0)))

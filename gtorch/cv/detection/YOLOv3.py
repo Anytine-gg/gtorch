@@ -2,11 +2,15 @@ import torch
 from torch import nn
 import torchsummary
 from gtorch.utils.datasets.VOCDetection_ import VOCDetection_
+from gtorch.utils.datasets.VOCLoaders import getVOC2012DetLoaders
 from gtorch.utils.datasets.YOLOv3Dataset import YOLOv3_Dataset
 from gtorch.cv.detection.tools import yolo3_loss
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
+from tqdm import tqdm
+import torch.amp as amp
+
 class DarknetResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super().__init__()
@@ -179,24 +183,25 @@ class YOLOv3(nn.Module):
         layer5_out = self.layer5(x)
         layer5_out = self.conv_set3(layer5_out)
         layer4_up = self.upsample_conv_3(layer5_out)
-        layer4_out = torch.cat([layer4_out,layer4_up],dim=1)
+        layer4_out = torch.cat([layer4_out, layer4_up], dim=1)
         layer4_out = self.conv_set2(layer4_out)
         layer3_up = self.upsample_conv_2(layer4_out)
-        layer3_out = torch.cat([layer3_out,layer3_up],dim=1)
+        layer3_out = torch.cat([layer3_out, layer3_up], dim=1)
         layer3_out = self.conv_set1(layer3_out)
         feat_map1 = self.get_map1(layer3_out)
         feat_map2 = self.get_map2(layer4_out)
         feat_map3 = self.get_map3(layer5_out)
-        return feat_map1,feat_map2,feat_map3
+        return feat_map1, feat_map2, feat_map3
 
 
 if __name__ == "__main__":
     net = YOLOv3(20, 3)
+    net.load_state_dict(torch.load('/root/projs/python/gtorch/data/test.pth',weights_only=True))
     net.to("cuda")
     tensor = torch.rand(3, 3, 416, 416).to("cuda")
-    epoch = 100
-    
-    transform = transform = A.Compose(
+    nEpochs = 100
+
+    train_transform = A.Compose(
         [
             A.LongestMaxSize(max_size=416),
             A.PadIfNeeded(
@@ -205,15 +210,47 @@ if __name__ == "__main__":
                 border_mode=cv2.BORDER_CONSTANT,
                 fill=(128, 128, 128),
             ),
+            A.Normalize(
+                mean=(0.485, 0.456, 0.406),   # ImageNet 均值
+                std=(0.229, 0.224, 0.225)     # ImageNet 标准差
+            ),
             ToTensorV2(),
         ],
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
+    val_transform = train_transform
 
-    dataset = VOCDetection_(transform=transform)
-    dataset = YOLOv3_Dataset(20, dataset,device='cuda')
-    
-    
-    for i in range(epoch):
-        # image,feat_map1,feat_map2,feat_map3 = 
+    train_dataset, train_loader, val_dataset, val_loader = getVOC2012DetLoaders(
+        train_transform, val_transform, batch_size=16
+    )
+    optim = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-5)
+    scaler = amp.GradScaler()    # 初始化 AMP 的 GradScaler
+
+    for epoch in range(nEpochs):
+        epoch_loss = 0.0
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{nEpochs}", unit="batch")
+        for imgData in pbar:
+            img, feat1, feat2, feat3 = imgData
+            img = img.to('cuda')
+            feat1 = feat1.to('cuda')
+            feat2 = feat2.to('cuda')
+            feat3 = feat3.to('cuda')
+            
+            optim.zero_grad()
+            with amp.autocast('cuda'):
+                pre_feat1, pre_feat2, pre_feat3 = net(img)
+                loss = (
+                    yolo3_loss(pre_feat1, feat1)
+                    + yolo3_loss(pre_feat2, feat2)
+                    + yolo3_loss(pre_feat3, feat3)
+                )/3
+            scaler.scale(loss).backward()
+            scaler.step(optim)
+            scaler.update()
+
+            iter_loss = loss.item()
+            epoch_loss += iter_loss
+            pbar.set_postfix(loss=iter_loss)
         
+        print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_loader)}")
+        torch.save(net.state_dict(),'./data/test.pth')        

@@ -77,67 +77,98 @@ def calc_IoU_tensor(bboxes, anchors):
 
 
 
-def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
-    """
-    predict_feat 和 label_feat 形状：(batch, (5+num_class)*3, grid_h, grid_w)
-    每个anchor的通道顺序为：tx, ty, tw, th, conf, class1, class2, ...
-    
-    计算过程：
-      1. 对tx和ty做sigmoid激活，然后与label中的tx,ty计算回归（MSE）损失（仅在conf=1时计算）
-      2. tw和th直接与label中的tw,th计算回归（MSE）损失（仅在conf=1时计算）
-      3. 对所有anchor用 BCEWithLogitsLoss 计算conf loss
-      4. 对于conf=1的anchor，用 BCEWithLogitsLoss 计算类别损失
-    """
-    batch, total_channels, grid_h, grid_w = predict_feat.shape
-    num_anchor = 3
-    num_class = total_channels // num_anchor - 5
-    
-    # 调整形状为 (batch, num_anchor, 5+num_class, grid_h, grid_w)
-    pred = predict_feat.view(batch, num_anchor, 5 + num_class, grid_h, grid_w)
-    label = label_feat.view(batch, num_anchor, 5 + num_class, grid_h, grid_w)
-    
-    # 对tx, ty进行sigmoid激活，分别在通道索引0,1
-    pred_tx = torch.sigmoid(pred[:, :, 0, :, :])
-    pred_ty = torch.sigmoid(pred[:, :, 1, :, :])
-    # tw, th直接保持原样（通道索引 2,3）
-    pred_tw = pred[:, :, 2, :, :]
-    pred_th = pred[:, :, 3, :, :]
-    
-    # 组合预测边界框
-    pred_box = torch.stack([pred_tx, pred_ty, pred_tw, pred_th], dim=2)
-    target_box = label[:, :, 0:4, :, :]
-    
-    # 置信度：通道索引 4
-    pred_conf = pred[:, :, 4, :, :]
-    target_conf = label[:, :, 4, :, :]
-    
-    # 类别预测：通道从5开始 (shape: (batch, num_anchor, num_class, grid_h, grid_w))
-    pred_class = pred[:, :, 5:, :, :]
-    target_class = label[:, :, 5:, :, :]
-    
-    # 仅在目标存在（target_conf==1）的anchor上计算回归和分类loss
-    object_mask = (target_conf == 1)
+import torch
+import torch.nn.functional as F
 
-    # 位置（边界框）损失：仅在object_mask为True的位置计算
-    loss_box = 0.0
-    if object_mask.sum() > 0:
-        pred_box_pos = pred_box[object_mask]
-        target_box_pos = target_box[object_mask]
-        loss_box = F.mse_loss(pred_box_pos, target_box_pos, reduction="mean")
+def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
+    # 确保输入形状一致
+    assert predict_feat.shape == label_feat.shape, "predict and label must have the same shape"
     
-    # 置信度loss：对所有anchor计算 (使用BCEWithLogitsLoss)
-    loss_conf = F.binary_cross_entropy_with_logits(pred_conf, target_conf, reduction="mean")
+    # 获取维度信息
+    b, _, w, h = predict_feat.shape
+    num_anchors = 3
+    num_classes = (predict_feat.shape[1] // num_anchors) - 5
     
-    # 分类loss：仅在object_mask为True的位置计算
-    loss_class = 0.0
-    if object_mask.sum() > 0:
-        # 将object_mask扩展到类别维度上
-        object_mask_class = object_mask.unsqueeze(2).expand_as(pred_class)
-        pred_class_pos = pred_class[object_mask_class]
-        target_class_pos = target_class[object_mask_class]
-        loss_class = F.binary_cross_entropy_with_logits(pred_class_pos, target_class_pos, reduction="mean")
+    # 将特征图重塑为 (b, anchors, 5+classes, w, h)
+    predict = predict_feat.view(b, num_anchors, 5+num_classes, w, h)
+    label = label_feat.view(b, num_anchors, 5+num_classes, w, h)
     
-    total_loss = loss_box + loss_conf + loss_class
+    # 分解预测结果
+    pred_tx_ty = predict[:, :, 0:2, :, :]    # 坐标tx, ty
+    pred_tw_th = predict[:, :, 2:4, :, :]    # 宽高tw, th
+    pred_conf = predict[:, :, 4, :, :]       # 置信度 (b, a, w, h)
+    pred_cls = predict[:, :, 5:, :, :]       # 分类预测 (b, a, c, w, h)
+    
+    # 分解标签结果
+    label_tx_ty = label[:, :, 0:2, :, :]
+    label_tw_th = label[:, :, 2:4, :, :]
+    label_conf = label[:, :, 4, :, :]        # 置信度标签
+    label_cls = label[:, :, 5:, :, :]
+    
+    # 生成物体掩码 (conf=1的位置)
+    obj_mask = label_conf == 1               # (b, a, w, h)
+    noobj_mask = label_conf == 0             # (b, a, w, h)
+    
+    # =====================
+    # 坐标损失计算 (仅对conf=1的位置)
+    # =====================
+    # 对tx, ty应用sigmoid
+    pred_tx_ty_sigmoid = torch.sigmoid(pred_tx_ty)
+    
+    # 扩展掩码到坐标维度
+    obj_mask_xy = obj_mask.unsqueeze(2).expand_as(pred_tx_ty_sigmoid)
+    loss_xy = F.mse_loss(
+        pred_tx_ty_sigmoid[obj_mask_xy],
+        label_tx_ty[obj_mask_xy],
+        reduction='sum'
+    )
+    
+    # 宽高损失
+    obj_mask_wh = obj_mask.unsqueeze(2).expand_as(pred_tw_th)
+    loss_wh = F.mse_loss(
+        pred_tw_th[obj_mask_wh],
+        label_tw_th[obj_mask_wh],
+        reduction='sum'
+    )
+    coord_loss = loss_xy + loss_wh
+    
+    # =====================
+    # 置信度损失计算
+    # =====================
+    # 正样本 (conf=1) 的置信度损失
+    obj_conf_loss = F.binary_cross_entropy_with_logits(
+        pred_conf[obj_mask],
+        label_conf[obj_mask],
+        reduction='sum'
+    )
+    
+    # 负样本 (conf=0) 的置信度损失
+    noobj_conf_loss = F.binary_cross_entropy_with_logits(
+        pred_conf[noobj_mask],
+        label_conf[noobj_mask],
+        reduction='sum'
+    )
+    
+    # 总置信度损失
+    conf_loss = obj_conf_loss + 0.5 * noobj_conf_loss  # 增加负样本权重控制
+    
+    # =====================
+    # 分类损失计算 (仅对conf=1的位置)
+    # =====================
+    # 扩展掩码到分类维度
+    obj_mask_cls = obj_mask.unsqueeze(2).expand(-1, -1, num_classes, -1, -1)
+    cls_loss = F.binary_cross_entropy_with_logits(
+        pred_cls[obj_mask_cls],
+        label_cls[obj_mask_cls],
+        reduction='sum'
+    )
+    
+    # =====================
+    # 总损失
+    # =====================
+    # 归一化损失 (除以正样本数量)
+    num_positive = obj_mask.sum().clamp(min=1)  # 至少为1，避免除零
+    total_loss = (coord_loss + conf_loss/10 + cls_loss) / num_positive
     return total_loss
 
 
