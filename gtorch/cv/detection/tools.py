@@ -168,7 +168,7 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     # =====================
     # 归一化损失 (除以正样本数量)
     num_positive = obj_mask.sum().clamp(min=1)  # 至少为1，避免除零
-    total_loss = (coord_loss + conf_loss/10 + cls_loss) / num_positive
+    total_loss = (coord_loss + conf_loss + cls_loss) / num_positive
     return total_loss
 
 
