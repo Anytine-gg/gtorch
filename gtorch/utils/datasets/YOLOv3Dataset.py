@@ -111,7 +111,7 @@ class YOLOv3_Dataset(Dataset):
                 #该anchor已被分配, iou从大到小排.
                 continue
             
-            txty = torch.logit(gt_pos / stride - cxcy)
+            txty = gt_pos / stride - cxcy # sigmoid后,再与txty做loss
             twth = torch.log(gt_size * stride / anchor_size)
             conf = 1
             label = bboxes_idx_iou[i,6].long()

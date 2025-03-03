@@ -78,55 +78,66 @@ def calc_IoU_tensor(bboxes, anchors):
 
 
 def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
-    # predict_feat和label_feat形状：(b, c, h, w)
-    # c = 3 * (5 + num_classes)
-    num_anchors = 3
-    b, c, h, w = predict_feat.shape
-    num_classes = c // num_anchors - 5
-
-    # 重构为 (b, 3, 5+num_classes, h, w)
-    pred = predict_feat.view(b, num_anchors, 5 + num_classes, h, w)
-    label = label_feat.view(b, num_anchors, 5 + num_classes, h, w)
-
-    # 分离各部分：
-    # 回归部分：tx,ty,tw,th 对应索引 0:4
-    pred_reg = pred[:, :, 0:4, :, :]
-    label_reg = label[:, :, 0:4, :, :]
+    """
+    predict_feat 和 label_feat 形状：(batch, (5+num_class)*3, grid_h, grid_w)
+    每个anchor的通道顺序为：tx, ty, tw, th, conf, class1, class2, ...
     
-    # 置信度：index 4
+    计算过程：
+      1. 对tx和ty做sigmoid激活，然后与label中的tx,ty计算回归（MSE）损失（仅在conf=1时计算）
+      2. tw和th直接与label中的tw,th计算回归（MSE）损失（仅在conf=1时计算）
+      3. 对所有anchor用 BCEWithLogitsLoss 计算conf loss
+      4. 对于conf=1的anchor，用 BCEWithLogitsLoss 计算类别损失
+    """
+    batch, total_channels, grid_h, grid_w = predict_feat.shape
+    num_anchor = 3
+    num_class = total_channels // num_anchor - 5
+    
+    # 调整形状为 (batch, num_anchor, 5+num_class, grid_h, grid_w)
+    pred = predict_feat.view(batch, num_anchor, 5 + num_class, grid_h, grid_w)
+    label = label_feat.view(batch, num_anchor, 5 + num_class, grid_h, grid_w)
+    
+    # 对tx, ty进行sigmoid激活，分别在通道索引0,1
+    pred_tx = torch.sigmoid(pred[:, :, 0, :, :])
+    pred_ty = torch.sigmoid(pred[:, :, 1, :, :])
+    # tw, th直接保持原样（通道索引 2,3）
+    pred_tw = pred[:, :, 2, :, :]
+    pred_th = pred[:, :, 3, :, :]
+    
+    # 组合预测边界框
+    pred_box = torch.stack([pred_tx, pred_ty, pred_tw, pred_th], dim=2)
+    target_box = label[:, :, 0:4, :, :]
+    
+    # 置信度：通道索引 4
     pred_conf = pred[:, :, 4, :, :]
-    label_conf = label[:, :, 4, :, :]
+    target_conf = label[:, :, 4, :, :]
     
-    # 分类部分：index 5:
-    pred_cls = pred[:, :, 5:, :, :]
-    label_cls = label[:, :, 5:, :, :]
+    # 类别预测：通道从5开始 (shape: (batch, num_anchor, num_class, grid_h, grid_w))
+    pred_class = pred[:, :, 5:, :, :]
+    target_class = label[:, :, 5:, :, :]
+    
+    # 仅在目标存在（target_conf==1）的anchor上计算回归和分类loss
+    object_mask = (target_conf == 1)
 
-    # 构造正样本 mask：只有当 label_conf==1 的地方，才计算回归和分类loss
-    pos_mask = label_conf == 1  # 形状: (b, 3, h, w)
-
-    # 1. 回归loss（仅对正样本计算），使用均方误差
-    if pos_mask.sum() > 0:
-        # 扩展mask，使得可以作用在回归通道上
-        pos_mask_reg = pos_mask.unsqueeze(2).expand_as(pred_reg)
-        reg_loss = F.mse_loss(pred_reg[pos_mask_reg], label_reg[pos_mask_reg], reduction='sum')
-    else:
-        reg_loss = torch.tensor(0., device=predict_feat.device)
-
-    # 2. 置信度loss，对所有区域使用二元交叉熵（这里直接用 BCEWithLogitsLoss，不需要手动sigmoid）
-    conf_loss = F.binary_cross_entropy_with_logits(pred_conf, label_conf, reduction='sum')
-
-    # 3. 分类loss，仅对正样本计算。这里题目要求先对每个类别通道做sigmoid，再与标签（独热编码）做 BCE
-    if pos_mask.sum() > 0:
-        pos_mask_cls = pos_mask.unsqueeze(2).expand_as(pred_cls)
-        # 对预测的类别做sigmoid
-        pred_cls_sig = torch.sigmoid(pred_cls)
-        cls_loss = F.binary_cross_entropy(pred_cls_sig[pos_mask_cls],
-                                          label_cls[pos_mask_cls],
-                                          reduction='sum')
-    else:
-        cls_loss = torch.tensor(0., device=predict_feat.device)
-
-    total_loss = reg_loss + conf_loss + cls_loss
+    # 位置（边界框）损失：仅在object_mask为True的位置计算
+    loss_box = 0.0
+    if object_mask.sum() > 0:
+        pred_box_pos = pred_box[object_mask]
+        target_box_pos = target_box[object_mask]
+        loss_box = F.mse_loss(pred_box_pos, target_box_pos, reduction="mean")
+    
+    # 置信度loss：对所有anchor计算 (使用BCEWithLogitsLoss)
+    loss_conf = F.binary_cross_entropy_with_logits(pred_conf, target_conf, reduction="mean")
+    
+    # 分类loss：仅在object_mask为True的位置计算
+    loss_class = 0.0
+    if object_mask.sum() > 0:
+        # 将object_mask扩展到类别维度上
+        object_mask_class = object_mask.unsqueeze(2).expand_as(pred_class)
+        pred_class_pos = pred_class[object_mask_class]
+        target_class_pos = target_class[object_mask_class]
+        loss_class = F.binary_cross_entropy_with_logits(pred_class_pos, target_class_pos, reduction="mean")
+    
+    total_loss = loss_box + loss_conf + loss_class
     return total_loss
 
 
