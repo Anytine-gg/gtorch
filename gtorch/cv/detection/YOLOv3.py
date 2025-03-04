@@ -287,6 +287,7 @@ def val():
         torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
     )
     net.to("cuda")
+    net.eval()
     transform = A.Compose(
         [
             A.LongestMaxSize(max_size=416),
