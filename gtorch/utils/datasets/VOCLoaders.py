@@ -16,7 +16,7 @@ from gtorch.utils.datasets.YOLOv3Dataset import YOLOv3_Dataset
 
 def getVOC2012SegLoaders(dir, train_transform, val_transform):
     pass
-def getVOC2012DetLoaders(train_transform,val_transform,batch_size,dir = './data',download=False):
+def getVOC2012DetLoaders(train_transform,val_transform,batch_size,dir = './data',download=False,val_shuffle = False):
     """
         获取VOC2012目标检测数据集Dateset和Dataloader \n
         Returns: train_dataset,train_loader,val_dataset,val_loader
@@ -26,7 +26,7 @@ def getVOC2012DetLoaders(train_transform,val_transform,batch_size,dir = './data'
     train_dataset = YOLOv3_Dataset(20,dataset=train_dataset)
     val_dataset = YOLOv3_Dataset(20,dataset=val_dataset)
     train_loader=  DataLoader(train_dataset,batch_size=batch_size,shuffle=True,num_workers=4)
-    val_loader=  DataLoader(val_dataset,batch_size=batch_size,shuffle=False,num_workers=4)
+    val_loader=  DataLoader(val_dataset,batch_size=batch_size,shuffle=val_shuffle,num_workers=4)
     return train_dataset,train_loader,val_dataset,val_loader
 def detectionDemo():
     # 目标检测用例，加入bbox_params可以使得bbox也跟着变化

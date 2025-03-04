@@ -222,7 +222,7 @@ if __name__ == "__main__":
     
 
     train_dataset, train_loader, val_dataset, val_loader = getVOC2012DetLoaders(
-        transform, transform, batch_size=16
+        transform, transform, batch_size=16,val_shuffle=True
     )
     optim = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-5)
     scaler = amp.GradScaler()    # 初始化 AMP 的 GradScaler
