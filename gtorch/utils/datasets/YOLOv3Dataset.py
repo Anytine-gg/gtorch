@@ -111,7 +111,7 @@ class YOLOv3_Dataset(Dataset):
                 continue
             
             txty = gt_pos / stride - cxcy # sigmoid后,再与txty做loss
-            twth = torch.log(gt_size * stride / anchor_size)
+            twth = torch.log(gt_size / anchor_size) # 不用再乘stride
             conf = 1
             label = bboxes_idx_iou[i,6].long()
             feat_map[anchor_idx // 3][step:step+2, cx, cy] =txty  
@@ -124,7 +124,7 @@ class YOLOv3_Dataset(Dataset):
 
     def __len__(self):
         return len(self.dataset)
-
+        
 
 if __name__ == "__main__":
     from gtorch.utils.datasets.VOCDetection_ import VOCDetection_

@@ -145,7 +145,7 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     )
 
     # 总置信度损失
-    conf_loss = obj_conf_loss + 0.5 * noobj_conf_loss  # 增加负样本权重控制
+    conf_loss = obj_conf_loss + 0.1 * noobj_conf_loss  # 增加负样本权重控制
 
     # =====================
     # 分类损失计算 (仅对conf=1的位置)
@@ -161,7 +161,8 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     # =====================
     # 归一化损失 (除以正样本数量)
     num_positive = obj_mask.sum().clamp(min=1)  # 至少为1，避免除零
-    total_loss = (coord_loss + conf_loss + cls_loss) / num_positive
+    
+    total_loss = (coord_loss + conf_loss + cls_loss) / b
     return total_loss
 
 

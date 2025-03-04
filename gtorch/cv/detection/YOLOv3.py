@@ -198,9 +198,9 @@ class YOLOv3(nn.Module):
 
 def train():
     net = YOLOv3(20, 3)
-    net.load_state_dict(
-        torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
-    )
+    # net.load_state_dict(
+    #     torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
+    # )
     net.to("cuda")
     nEpochs = 100
 
@@ -283,9 +283,9 @@ def val():
     import matplotlib.pyplot as plt
     import numpy as np
     net = YOLOv3(20, 3)
-    net.load_state_dict(
-        torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
-    )
+    # net.load_state_dict(
+    #     torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
+    # )
     net.to("cuda")
     net.eval()
     transform = A.Compose(
@@ -336,4 +336,4 @@ def val():
 
 if __name__ == "__main__":
 
-    val()
+    train()
