@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 
+
 def calc_IoU(box1, box2):
     """
     计算 IoU
@@ -76,93 +77,85 @@ def calc_IoU_tensor(bboxes, anchors):
     return iou
 
 
-
 import torch
 import torch.nn.functional as F
 
+
 def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     # 确保输入形状一致
-    assert predict_feat.shape == label_feat.shape, "predict and label must have the same shape"
-    
+    assert (
+        predict_feat.shape == label_feat.shape
+    ), "predict and label must have the same shape"
+
     # 获取维度信息
     b, _, w, h = predict_feat.shape
     num_anchors = 3
     num_classes = (predict_feat.shape[1] // num_anchors) - 5
-    
+
     # 将特征图重塑为 (b, anchors, 5+classes, w, h)
-    predict = predict_feat.view(b, num_anchors, 5+num_classes, w, h)
-    label = label_feat.view(b, num_anchors, 5+num_classes, w, h)
-    
+    predict = predict_feat.view(b, num_anchors, 5 + num_classes, w, h)
+    label = label_feat.view(b, num_anchors, 5 + num_classes, w, h)
+
     # 分解预测结果
-    pred_tx_ty = predict[:, :, 0:2, :, :]    # 坐标tx, ty
-    pred_tw_th = predict[:, :, 2:4, :, :]    # 宽高tw, th
-    pred_conf = predict[:, :, 4, :, :]       # 置信度 (b, a, w, h)
-    pred_cls = predict[:, :, 5:, :, :]       # 分类预测 (b, a, c, w, h)
-    
+    pred_tx_ty = predict[:, :, 0:2, :, :]  # 坐标tx, ty
+    pred_tw_th = predict[:, :, 2:4, :, :]  # 宽高tw, th
+    pred_conf = predict[:, :, 4, :, :]  # 置信度 (b, a, w, h)
+    pred_cls = predict[:, :, 5:, :, :]  # 分类预测 (b, a, c, w, h)
+
     # 分解标签结果
     label_tx_ty = label[:, :, 0:2, :, :]
     label_tw_th = label[:, :, 2:4, :, :]
-    label_conf = label[:, :, 4, :, :]        # 置信度标签
+    label_conf = label[:, :, 4, :, :]  # 置信度标签
     label_cls = label[:, :, 5:, :, :]
-    
+
     # 生成物体掩码 (conf=1的位置)
-    obj_mask = label_conf == 1               # (b, a, w, h)
-    noobj_mask = label_conf == 0             # (b, a, w, h)
-    
+    obj_mask = label_conf == 1  # (b, a, w, h)
+    noobj_mask = label_conf == 0  # (b, a, w, h)
+
     # =====================
     # 坐标损失计算 (仅对conf=1的位置)
     # =====================
     # 对tx, ty应用sigmoid
     pred_tx_ty_sigmoid = torch.sigmoid(pred_tx_ty)
-    
+
     # 扩展掩码到坐标维度
     obj_mask_xy = obj_mask.unsqueeze(2).expand_as(pred_tx_ty_sigmoid)
     loss_xy = F.mse_loss(
-        pred_tx_ty_sigmoid[obj_mask_xy],
-        label_tx_ty[obj_mask_xy],
-        reduction='sum'
+        pred_tx_ty_sigmoid[obj_mask_xy], label_tx_ty[obj_mask_xy], reduction="sum"
     )
-    
+
     # 宽高损失
     obj_mask_wh = obj_mask.unsqueeze(2).expand_as(pred_tw_th)
     loss_wh = F.mse_loss(
-        pred_tw_th[obj_mask_wh],
-        label_tw_th[obj_mask_wh],
-        reduction='sum'
+        pred_tw_th[obj_mask_wh], label_tw_th[obj_mask_wh], reduction="sum"
     )
     coord_loss = loss_xy + loss_wh
-    
+
     # =====================
     # 置信度损失计算
     # =====================
     # 正样本 (conf=1) 的置信度损失
     obj_conf_loss = F.binary_cross_entropy_with_logits(
-        pred_conf[obj_mask],
-        label_conf[obj_mask],
-        reduction='sum'
+        pred_conf[obj_mask], label_conf[obj_mask], reduction="sum"
     )
-    
+
     # 负样本 (conf=0) 的置信度损失
     noobj_conf_loss = F.binary_cross_entropy_with_logits(
-        pred_conf[noobj_mask],
-        label_conf[noobj_mask],
-        reduction='sum'
+        pred_conf[noobj_mask], label_conf[noobj_mask], reduction="sum"
     )
-    
+
     # 总置信度损失
     conf_loss = obj_conf_loss + 0.5 * noobj_conf_loss  # 增加负样本权重控制
-    
+
     # =====================
     # 分类损失计算 (仅对conf=1的位置)
     # =====================
     # 扩展掩码到分类维度
     obj_mask_cls = obj_mask.unsqueeze(2).expand(-1, -1, num_classes, -1, -1)
     cls_loss = F.binary_cross_entropy_with_logits(
-        pred_cls[obj_mask_cls],
-        label_cls[obj_mask_cls],
-        reduction='sum'
+        pred_cls[obj_mask_cls], label_cls[obj_mask_cls], reduction="sum"
     )
-    
+
     # =====================
     # 总损失
     # =====================
@@ -172,6 +165,86 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     return total_loss
 
 
+def nms(
+    pred_feat: torch.Tensor,
+    conf_threshold=0.7,
+    nms_threshold=0.5,
+    anchor_size=[
+        [(10, 13), (16, 30), (33, 23)],  # 52*52
+        [(30, 61), (62, 45), (59, 119)],  # 26*26
+        [(116, 90), (156, 198), (373, 326)],  # 13*13
+    ],
+):
+    _, c, w, h = pred_feat.shape
+    nClass = c // 3 - 5
+    assert w == h, "Width and height of feature map must be same!"
+    assert (
+        w == 52 or w == 26 or w == 13
+    ), """The size of feature map is not supported!
+            (Supported size: 52*52 26*26 13*13)
+        """
+    if w == 52:
+        stride = 8
+        anchor_size = anchor_size[0]
+    elif w == 26:
+        stride = 16
+        anchor_size = anchor_size[1]
+    else:  # w == 13
+        stride = 32
+        anchor_size = anchor_size[2]
+    anchor_size = torch.tensor(
+        anchor_size, dtype=torch.float32, device=pred_feat.device
+    )
+    pred_feat = pred_feat.permute(0, 2, 3, 1).reshape(-1, 5 + nClass)
+    x = torch.arange(w)
+    y = torch.arange(w)
+    # 生成[0 0;1 0;2 0;...;0 51;...;51 51]网格，记录位置。第一列为cx，第二列为cy
+    grid_x, grid_y = torch.meshgrid(x, y, indexing="ij")
+    grid = torch.stack([grid_y.flatten(), grid_x.flatten()], dim=1)
+    grid = grid.repeat_interleave(3, 0).to(pred_feat.device)
+    anchor_size = anchor_size.repeat(w * h, 1)  # 记录每一行anchor的尺寸
+    # pred_feat的每个行是一个anchor检测头，前5个是tx,ty,tw,th,conf，后面是classes置信度
+    # 最后四列是anchor所在的cx,cy,以及anchor的w和h
+    pred_feat = torch.cat([pred_feat, grid, anchor_size], dim=1)
+    torch.sigmoid_(pred_feat[:,4:5+nClass])
+    conf_col = pred_feat[:, 4]
+    mask = conf_col >= conf_threshold
+    pred_feat = pred_feat[mask]  # 筛选掉bbox置信度小于threshold的框
+    # tx ty tw th 转为 bx by bw bh
+    pred_feat[:, 0] = torch.sigmoid(pred_feat[:, 0]) + pred_feat[:, -4]  # cx
+    pred_feat[:, 1] = torch.sigmoid(pred_feat[:, 1]) + pred_feat[:, -3]  # cy
+    pred_feat[:, 0:2] *= stride
+    pred_feat[:, 2] = pred_feat[:, -2] * torch.exp(pred_feat[:, 2])
+    pred_feat[:, 3] = pred_feat[:, -1] * torch.exp(pred_feat[:, 3])
+    pred_feat = pred_feat[:, :-4]  # 舍去后4列
 
-if __name__ == '__main__':
-   pass
+    reserved_anchors = [] #符合条件的anchor
+    # print(pred_feat[:,0:5])
+    while pred_feat.numel() != 0:
+        # 属于类别置信度的那部分
+        class_conf = pred_feat[:, 5 : nClass + 5]
+        max_class_conf = torch.max(class_conf)
+        if max_class_conf < conf_threshold:  # 若最大的类别置信度小于threshold，退出
+            break
+        argmax_class_conf = torch.unravel_index(
+            torch.argmax(class_conf), class_conf.shape
+        )
+        # 获取最大值，得到位置
+        argmax_anchor, argmax_class = argmax_class_conf
+        argmax_class += 5
+        # 拿出class conf最大的，与其他anchor做iou，若大于threshold, 舍弃
+        reserved_anchors.append(pred_feat[argmax_anchor,:4]) #保留最大置信度anchor
+        origin = pred_feat[:, :4]
+        target = pred_feat[argmax_anchor,:4].repeat(pred_feat.size(0), 1) #手动广播
+        iou = calc_IoU_tensor(origin,target)
+        pred_feat = pred_feat[iou < nms_threshold] # 大于阈值的被舍弃
+    if reserved_anchors == []:
+        return torch.empty((0, 4), device=pred_feat.device)
+    reserved_anchors = torch.stack(reserved_anchors)
+    return reserved_anchors
+
+
+if __name__ == "__main__":
+
+    feat = torch.rand(1, 75, 52, 52).to('cuda')
+    nms(feat)

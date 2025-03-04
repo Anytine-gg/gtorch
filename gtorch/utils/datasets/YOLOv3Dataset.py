@@ -14,15 +14,15 @@ class YOLOv3_Dataset(Dataset):
         self,
         num_of_classes,
         dataset=None,
-        anchors=[
+        anchor_size=[
             [(10, 13), (16, 30), (33, 23)],
             [(30, 61), (62, 45), (59, 119)],
             [(116, 90), (156, 198), (373, 326)],
-        ],
+        ]
     ):
         super().__init__()
         self.dataset = dataset
-        self.anchors = anchors
+        self.anchors = anchor_size
         self.num_of_classes = num_of_classes
         self.device = 'cpu'  #cuda无法用于多线程
 
