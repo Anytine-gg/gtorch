@@ -253,12 +253,15 @@ if __name__ == "__main__":
             iter_loss = loss.item()
             epoch_loss += iter_loss
             pbar.set_postfix(loss=iter_loss)
-            break
         net.eval()
         with torch.no_grad():
             val_loss = 0.0
+            cnt = 0
             for valData in val_loader:
                 img, feat1, feat2, feat3 = valData
+                cnt += img.size(0)
+                if cnt > 300:
+                    break
                 img = img.to('cuda')
                 feat1 = feat1.to('cuda')
                 feat2 = feat2.to('cuda')
@@ -271,5 +274,5 @@ if __name__ == "__main__":
                 )/3
                 val_loss += loss.item()
         print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_loader)}")
-        print(f"Validation Loss: {val_loss/len(val_loader)}")
+        print(f"Validation Loss: {val_loss/cnt}")
         torch.save(net.state_dict(),'./data/test.pth')        
