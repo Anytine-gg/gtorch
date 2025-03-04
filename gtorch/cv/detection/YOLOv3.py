@@ -201,7 +201,7 @@ if __name__ == "__main__":
     tensor = torch.rand(3, 3, 416, 416).to("cuda")
     nEpochs = 100
 
-    train_transform = A.Compose(
+    transform = A.Compose(
         [
             A.LongestMaxSize(max_size=416),
             A.PadIfNeeded(
@@ -218,10 +218,11 @@ if __name__ == "__main__":
         ],
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
-    val_transform = train_transform
+    
+    
 
     train_dataset, train_loader, val_dataset, val_loader = getVOC2012DetLoaders(
-        train_transform, val_transform, batch_size=16
+        transform, transform, batch_size=16
     )
     optim = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-5)
     scaler = amp.GradScaler()    # 初始化 AMP 的 GradScaler
@@ -229,6 +230,7 @@ if __name__ == "__main__":
     for epoch in range(nEpochs):
         epoch_loss = 0.0
         pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{nEpochs}", unit="batch")
+        net.train()
         for imgData in pbar:
             img, feat1, feat2, feat3 = imgData
             img = img.to('cuda')
@@ -251,6 +253,23 @@ if __name__ == "__main__":
             iter_loss = loss.item()
             epoch_loss += iter_loss
             pbar.set_postfix(loss=iter_loss)
-        
+            break
+        net.eval()
+        with torch.no_grad():
+            val_loss = 0.0
+            for valData in val_loader:
+                img, feat1, feat2, feat3 = valData
+                img = img.to('cuda')
+                feat1 = feat1.to('cuda')
+                feat2 = feat2.to('cuda')
+                feat3 = feat3.to('cuda')
+                pre_feat1, pre_feat2, pre_feat3 = net(img)
+                loss = (
+                    yolo3_loss(pre_feat1, feat1)
+                    + yolo3_loss(pre_feat2, feat2)
+                    + yolo3_loss(pre_feat3, feat3)
+                )/3
+                val_loss += loss.item()
         print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_loader)}")
+        print(f"Validation Loss: {val_loss/len(val_loader)}")
         torch.save(net.state_dict(),'./data/test.pth')        
