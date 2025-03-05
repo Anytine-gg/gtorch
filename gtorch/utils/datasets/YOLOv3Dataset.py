@@ -28,6 +28,7 @@ class YOLOv3_Dataset(Dataset):
 
     def __getitem__(self, index):
         image, bboxes, labels = self.dataset[index]
+        print(torch.tensor(bboxes))
         device = self.device
         image = image.to(device)
         feat_map1 = torch.zeros(3 * (5 + self.num_of_classes), 52, 52,device=device).float()
@@ -82,7 +83,7 @@ class YOLOv3_Dataset(Dataset):
 
         max_iou, argmax = torch.max(iou, dim=1)
         
-        # 生成一个bboxes_idx_iou tensor,每一行是一个bbox的cx,cy,w,h,idx,iou.
+        # 生成一个bboxes_idx_iou tensor,每一行是一个bbox的x,y,w,h,idx,iou.
         # idx是负责预测的anchor的idx,iou是最大的iou. 在iou处排序,确保最大的在前,避免一个anchor预测多个bbox
         bboxes_idx_iou = torch.cat(
             [bboxes_origin, argmax.unsqueeze(1), max_iou.unsqueeze(1),labels.unsqueeze(1)],
@@ -93,6 +94,7 @@ class YOLOv3_Dataset(Dataset):
 
         for i in range(num_of_bboxes):
             anchor_idx = bboxes_idx_iou[i, 4].long()
+            
             
             # 获取负责预测的anchor的grid的位置
             anchor = anchors[i, anchor_idx]
@@ -105,13 +107,19 @@ class YOLOv3_Dataset(Dataset):
             cxcy = centers[i, anchor_idx]
             cx, cy = cxcy.long()
             
+            
+            
             step = (anchor_idx % 3) * (5 + self.num_of_classes)
             if feat_map[anchor_idx // 3][step+4,cx,cy] != 0:
                 #该anchor已被分配, iou从大到小排.
                 continue
             
-            txty = gt_pos / stride - cxcy # sigmoid后,再与txty做loss
-            twth = torch.log(gt_size / anchor_size) # 不用再乘stride
+            #* Update: 直接返回gt的x,y,w,h，再做loss
+            # txty = gt_pos / stride - cxcy # sigmoid后,再与txty做loss
+            # twth = torch.log(gt_size / anchor_size) # 不用再乘stride
+            txty = bboxes_idx_iou[i,:2]
+            twth = bboxes_idx_iou[i,2:4]
+            print(txty,twth)
             conf = 1
             label = bboxes_idx_iou[i,6].long()
             feat_map[anchor_idx // 3][step:step+2, cx, cy] =txty  
@@ -146,5 +154,6 @@ if __name__ == "__main__":
     dataset = VOCDetection_(transform=transform)
     dataset = YOLOv3_Dataset(20, dataset)
     pred_feat = torch.randn(1, 75, 52, 52)
-    print(dataset[1][1].unsqueeze(0).shape)
-    print(yolo3_loss(pred_feat,dataset[1][1].unsqueeze(0)))
+    dataset[1]
+    # print(dataset[1][1].unsqueeze(0).shape)
+    # print(yolo3_loss(pred_feat,dataset[1][1].unsqueeze(0)))
