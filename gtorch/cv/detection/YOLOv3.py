@@ -196,11 +196,12 @@ class YOLOv3(nn.Module):
         return feat_map1, feat_map2, feat_map3
 
 
-def train():
+def train(load=False):
     net = YOLOv3(20, 3)
-    # net.load_state_dict(
-    #     torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
-    # )
+    if load:
+        net.load_state_dict(
+            torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
+        )
     net.to("cuda")
     nEpochs = 100
 
@@ -225,7 +226,7 @@ def train():
     train_dataset, train_loader, val_dataset, val_loader = getVOC2012DetLoaders(
         transform, transform, batch_size=16, val_shuffle=True
     )
-    optim = torch.optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-5)
+    optim = torch.optim.Adam(net.parameters(), lr=5e-4, weight_decay=1e-5)   
     scaler = amp.GradScaler()  # 初始化 AMP 的 GradScaler
 
     for epoch in range(nEpochs):
@@ -257,12 +258,9 @@ def train():
         net.eval()
         with torch.no_grad():
             val_loss = 0.0
-            cnt = 0
+
             for valData in val_loader:
                 img, feat1, feat2, feat3 = valData
-                cnt += img.size(0)
-                if cnt > 300:
-                    break
                 img = img.to("cuda")
                 feat1 = feat1.to("cuda")
                 feat2 = feat2.to("cuda")
@@ -274,8 +272,8 @@ def train():
                     + yolo3_loss(pre_feat3, feat3)
                 ) / 3
                 val_loss += loss.item()
-        print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_loader)}")
-        print(f"Validation Loss: {val_loss/cnt}")
+        print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_dataset)}")
+        print(f"Validation Loss: {val_loss/len(val_dataset)}")
         torch.save(net.state_dict(), "./data/test.pth")
 
 
@@ -283,9 +281,9 @@ def val():
     import matplotlib.pyplot as plt
     import numpy as np
     net = YOLOv3(20, 3)
-    # net.load_state_dict(
-    #     torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
-    # )
+    net.load_state_dict(
+        torch.load("/root/projs/python/gtorch/data/test.pth", weights_only=True)
+    )
     net.to("cuda")
     net.eval()
     transform = A.Compose(
@@ -311,8 +309,8 @@ def val():
     )
     mean = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32)
     std = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32)
-    img, _, _, _ = next(iter(val_loader))
-    img:torch.Tensor = img[0]
+    img, _, _, _ = next(iter(train_loader))
+    img: torch.Tensor = img[0]
     predict = img.unsqueeze(0).to('cuda')
     predict = net(predict)
     feat1,feat2,feat3 = predict
@@ -322,7 +320,7 @@ def val():
     bboxes2 = nms(feat2,conf_threshold=0.1,nms_threshold=0.2)
     bboxes3 = nms(feat3,conf_threshold=0.1,nms_threshold=0.2)
     bboxes = torch.cat([bboxes1,bboxes2,bboxes3],dim=0)
-    print(bboxes)
+    print((torch.sigmoid(pred_feat[:,4])>0.5).sum())
     # 逆运算
     img = img.permute(1, 2, 0)  # 将通道维度移到最后
     img = img * std + mean  # 逆标准化
@@ -331,9 +329,9 @@ def val():
     # 显示图像
     plt.imshow(img)
     plt.axis('off')
-    plt.show()
+    plt.show()  
     print(img.shape)
 
 if __name__ == "__main__":
 
-    train()
+    train(load=False)
