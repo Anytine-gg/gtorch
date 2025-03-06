@@ -82,89 +82,24 @@ import torch.nn.functional as F
 
 
 def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
-    # 确保输入形状一致
+    n,c,w,h = predict_feat.shape
+    nClass = c // 3 - 5
+    assert w == h, "Width and height of feature map must be same!"
     assert (
-        predict_feat.shape == label_feat.shape
-    ), "predict and label must have the same shape"
+        w == 52 or w == 26 or w == 13
+    ), """The size of feature map is not supported!
+            (Supported size: 52*52 26*26 13*13)
+        """
+    if w == 52:
+        stride = 8
+    elif w == 26:
+        stride = 16
+    else:  # w == 13
+        stride = 32
+    # 每一行为
+    pred_feat = pred_feat.permute(0, 2, 3, 1).reshape(-1, 5 + nClass)
 
-    # 获取维度信息
-    b, _, w, h = predict_feat.shape
-    num_anchors = 3
-    num_classes = (predict_feat.shape[1] // num_anchors) - 5
-
-    # 将特征图重塑为 (b, anchors, 5+classes, w, h)
-    predict = predict_feat.view(b, num_anchors, 5 + num_classes, w, h)
-    label = label_feat.view(b, num_anchors, 5 + num_classes, w, h)
-
-    # 分解预测结果
-    pred_tx_ty = predict[:, :, 0:2, :, :]  # 坐标tx, ty
-    pred_tw_th = predict[:, :, 2:4, :, :]  # 宽高tw, th
-    pred_conf = predict[:, :, 4, :, :]  # 置信度 (b, a, w, h)
-    pred_cls = predict[:, :, 5:, :, :]  # 分类预测 (b, a, c, w, h)
-
-    # 分解标签结果
-    label_tx_ty = label[:, :, 0:2, :, :]
-    label_tw_th = label[:, :, 2:4, :, :]
-    label_conf = label[:, :, 4, :, :]  # 置信度标签
-    label_cls = label[:, :, 5:, :, :]
-
-    # 生成物体掩码 (conf=1的位置)
-    obj_mask = label_conf == 1  # (b, a, w, h)
-    noobj_mask = label_conf == 0  # (b, a, w, h)
-
-    # =====================
-    # 坐标损失计算 (仅对conf=1的位置)
-    # =====================
-    # 对tx, ty应用sigmoid
-    pred_tx_ty_sigmoid = torch.sigmoid(pred_tx_ty)
-
-    # 扩展掩码到坐标维度
-    obj_mask_xy = obj_mask.unsqueeze(2).expand_as(pred_tx_ty_sigmoid)
-    loss_xy = F.mse_loss(
-        pred_tx_ty_sigmoid[obj_mask_xy], label_tx_ty[obj_mask_xy], reduction="sum"
-    )
-
-    # 宽高损失
-    obj_mask_wh = obj_mask.unsqueeze(2).expand_as(pred_tw_th)
-    loss_wh = F.mse_loss(
-        pred_tw_th[obj_mask_wh], label_tw_th[obj_mask_wh], reduction="sum"
-    )
-    coord_loss = loss_xy + loss_wh
-
-    # =====================
-    # 置信度损失计算
-    # =====================
-    # 正样本 (conf=1) 的置信度损失
-    obj_conf_loss = F.binary_cross_entropy_with_logits(
-        pred_conf[obj_mask], label_conf[obj_mask], reduction="sum"
-    )
-
-    # 负样本 (conf=0) 的置信度损失
-    noobj_conf_loss = F.binary_cross_entropy_with_logits(
-        pred_conf[noobj_mask], label_conf[noobj_mask], reduction="sum"
-    )
-
-    # 总置信度损失
-    conf_loss = obj_conf_loss + 0.1 * noobj_conf_loss  # 增加负样本权重控制
-
-    # =====================
-    # 分类损失计算 (仅对conf=1的位置)
-    # =====================
-    # 扩展掩码到分类维度
-    obj_mask_cls = obj_mask.unsqueeze(2).expand(-1, -1, num_classes, -1, -1)
-    cls_loss = F.binary_cross_entropy_with_logits(
-        pred_cls[obj_mask_cls], label_cls[obj_mask_cls], reduction="sum"
-    )
-
-    # =====================
-    # 总损失
-    # =====================
-    # 归一化损失 (除以正样本数量)
-    num_positive = obj_mask.sum().clamp(min=1)  # 至少为1，避免除零
     
-    total_loss = (coord_loss + conf_loss + cls_loss) / b
-    return total_loss
-
 
 def nms(
     pred_feat: torch.Tensor,
