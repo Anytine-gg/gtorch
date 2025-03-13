@@ -255,25 +255,25 @@ def train(load=False):
             iter_loss = loss.item()
             epoch_loss += iter_loss
             pbar.set_postfix(loss=iter_loss)
-        net.eval()
-        with torch.no_grad():
-            val_loss = 0.0
+        # net.eval()
+        # with torch.no_grad():
+        #     val_loss = 0.0
 
-            for valData in val_loader:
-                img, feat1, feat2, feat3 = valData
-                img = img.to("cuda")
-                feat1 = feat1.to("cuda")
-                feat2 = feat2.to("cuda")
-                feat3 = feat3.to("cuda")
-                pre_feat1, pre_feat2, pre_feat3 = net(img)
-                loss = (
-                    yolo3_loss(pre_feat1, feat1)
-                    + yolo3_loss(pre_feat2, feat2)
-                    + yolo3_loss(pre_feat3, feat3)
-                ) / 3
-                val_loss += loss.item()
+        #     for valData in val_loader:
+        #         img, feat1, feat2, feat3 = valData
+        #         img = img.to("cuda")
+        #         feat1 = feat1.to("cuda")
+        #         feat2 = feat2.to("cuda")
+        #         feat3 = feat3.to("cuda")
+        #         pre_feat1, pre_feat2, pre_feat3 = net(img)
+        #         loss = (
+        #             yolo3_loss(pre_feat1, feat1)
+        #             + yolo3_loss(pre_feat2, feat2)
+        #             + yolo3_loss(pre_feat3, feat3)
+        #         ) / 3
+        #         val_loss += loss.item()
         print(f"Epoch {epoch+1} loss: {epoch_loss/len(train_dataset)}")
-        print(f"Validation Loss: {val_loss/len(val_dataset)}")
+        # print(f"Validation Loss: {val_loss/len(val_dataset)}")
         torch.save(net.state_dict(), "./data/test.pth")
 
 
@@ -334,4 +334,4 @@ def val():
 
 if __name__ == "__main__":
 
-    train(load=False)
+    train()

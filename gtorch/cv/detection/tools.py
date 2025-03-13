@@ -127,19 +127,28 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     coord_loss = loss_xy + loss_wh
     
     # =====================
-    # 置信度损失（使用BCEWithLogits）
+    # 置信度损失（使用BCEWithLogits + Focal Loss）
     # =====================
+    # 应用Focal Loss思想减轻易分样本影响
+    gamma = 2.0
+    # 正样本置信度损失
     obj_conf_loss = F.binary_cross_entropy_with_logits(
         pred_conf[obj_mask],
         label_conf[obj_mask],
-        reduction='sum'
+        reduction='none'
     )
+    pt_obj = torch.sigmoid(pred_conf[obj_mask])
+    obj_focal_weights = (1 - pt_obj) ** gamma
+    obj_conf_loss = (obj_conf_loss * obj_focal_weights).sum()
+    
+    # 负样本置信度损失 - 降低权重到0.05
+    noobj_weight = 0.05  # 显著降低负样本权重
     noobj_conf_loss = F.binary_cross_entropy_with_logits(
         pred_conf[noobj_mask],
         label_conf[noobj_mask],
         reduction='sum'
     )
-    conf_loss = obj_conf_loss +  noobj_conf_loss * 0.5# 负样本权重
+    conf_loss = obj_conf_loss + noobj_weight * noobj_conf_loss
     
     # =====================
     # 分类损失（使用BCEWithLogits）
@@ -155,7 +164,27 @@ def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     # 总损失（加权求和）
     # =====================
     num_positive = obj_mask.sum().clamp(min=1)
-    total_loss = (5.0 * coord_loss + conf_loss + cls_loss) / num_positive
+    
+    # 增加正样本损失的权重
+    lambda_coord = 10.0  # 增大坐标损失权重
+    lambda_conf = 5.0   # 增大置信度损失权重
+    lambda_cls = 1.0     # 分类损失权重
+    
+    total_loss = (lambda_coord * coord_loss + lambda_conf * conf_loss + lambda_cls * cls_loss) / num_positive
+    
+    # 调试信息
+    with torch.no_grad():
+        pos_count = obj_mask.sum().item()
+        neg_count = noobj_mask.sum().item()
+        pos_conf_avg = torch.sigmoid(pred_conf[obj_mask]).mean().item() if pos_count > 0 else 0
+        neg_conf_avg = torch.sigmoid(pred_conf[noobj_mask]).mean().item() if neg_count > 0 else 0
+        
+        # 每10个batch输出一次调试信息
+        if torch.distributed.get_rank() if torch.distributed.is_initialized() else 0 == 0:
+            if torch.rand(1).item() < 0.1:  # 随机10%的概率打印
+                print(f"正样本数: {pos_count}, 负样本数: {neg_count}, 正负比例: {pos_count/(neg_count+1e-6):.6f}")
+                print(f"正样本平均置信度: {pos_conf_avg:.4f}, 负样本平均置信度: {neg_conf_avg:.4f}")
+                print(f"坐标损失: {coord_loss.item()/num_positive:.4f}, 置信度损失: {conf_loss.item()/num_positive:.4f}, 分类损失: {cls_loss.item()/num_positive:.4f}")
     
     return total_loss
 
