@@ -76,6 +76,47 @@ def calc_IoU_tensor(bboxes, anchors):
     union_area = bboxes_area + anchors_area - inter_area
     iou = inter_area / union_area
     return iou
+def calc_IoU_tensor_v2(bboxes: torch.Tensor, anchors: torch.Tensor) -> torch.Tensor:
+    """计算两组边界框之间的IoU矩阵
+    
+    Args:
+        bboxes: shape为(n,4)的张量，格式为(x_min,y_min,x_max,y_max)
+        anchors: shape为(m,4)的张量，格式为(x_min,y_min,x_max,y_max)
+    
+    Returns:
+        torch.Tensor: shape为(m,n)的IoU矩阵,matrix[i,j]表示第i个anchor和第j个bbox的IoU
+    """
+    # 获取边界框数量
+    n_bboxes = bboxes.size(0)
+    n_anchors = anchors.size(0)
+    
+    # 将bboxes和anchors扩展为3维以便广播
+    # bboxes: (n,4) -> (n,1,4) -> (n,m,4)
+    # anchors: (m,4) -> (1,m,4) -> (n,m,4)
+    bboxes = bboxes.unsqueeze(1).expand(n_bboxes, n_anchors, 4)
+    anchors = anchors.unsqueeze(0).expand(n_bboxes, n_anchors, 4)
+    
+    # 计算交集的左上角和右下角
+    inter_top_left = torch.max(bboxes[..., :2], anchors[..., :2])     # (n,m,2)
+    inter_bottom_right = torch.min(bboxes[..., 2:], anchors[..., 2:]) # (n,m,2)
+    
+    # 计算交集区域
+    inter_wh = (inter_bottom_right - inter_top_left).clamp(min=0)     # (n,m,2)
+    inter_area = inter_wh[..., 0] * inter_wh[..., 1]                  # (n,m)
+    
+    # 计算各自的面积
+    bboxes_area = (bboxes[..., 2] - bboxes[..., 0]) * \
+                  (bboxes[..., 3] - bboxes[..., 1])    # (n,m)
+    anchors_area = (anchors[..., 2] - anchors[..., 0]) * \
+                   (anchors[..., 3] - anchors[..., 1])  # (n,m)
+    
+    # 计算并集面积
+    union_area = bboxes_area + anchors_area - inter_area  # (n,m)
+    
+    # 计算IoU并转置为(m,n)
+    iou = (inter_area / (union_area + 1e-6)).t()  # (m,n)
+    
+    return iou
 
 def yolo3_loss(predict_feat: torch.Tensor, label_feat: torch.Tensor):
     assert predict_feat.shape == label_feat.shape, "预测和标签形状需一致"
@@ -304,4 +345,4 @@ def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16):
 if __name__ == "__main__":
     feat_size = (50, 38)
     stride = 16
-    print(AnchorGenerator(feat_size))
+    print(AnchorGenerator(feat_size).reshape(50,38,9,4))
