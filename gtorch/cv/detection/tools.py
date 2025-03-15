@@ -303,7 +303,7 @@ def nms(
     reserved_anchors = torch.stack(reserved_anchors)
     return reserved_anchors
 
-def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16):
+def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16, crop=False):
     # 基础尺寸
     base_size = stride
 
@@ -338,6 +338,17 @@ def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16):
         grid_points.unsqueeze(1) + 
         base_anchors.unsqueeze(0)
     ).reshape(-1, 4)  # shape: (H*W*num_anchors, 4)
+
+    if crop:
+        # 计算图像边界
+        img_h = feat_size[0] * stride
+        img_w = feat_size[1] * stride
+        
+        # 限制坐标在图像内
+        all_anchors[..., 0] = all_anchors[..., 0].clamp(min=0, max=img_w)  # x1
+        all_anchors[..., 1] = all_anchors[..., 1].clamp(min=0, max=img_h)  # y1
+        all_anchors[..., 2] = all_anchors[..., 2].clamp(min=0, max=img_w)  # x2
+        all_anchors[..., 3] = all_anchors[..., 3].clamp(min=0, max=img_h)  # y2
 
     return all_anchors
     

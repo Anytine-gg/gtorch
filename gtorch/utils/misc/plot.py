@@ -3,7 +3,7 @@ import matplotlib.patches as patches
 import torch
 import numpy as np
 import cv2
-def plot_bbox(image, bboxes, labels):
+def plot_bbox(image, bboxes, labels, format='xyxy'):
     # 如果 image 是 torch.Tensor，则转换为 numpy 数组
     if hasattr(image, "detach"):
         image = image.detach().cpu().numpy()
@@ -22,13 +22,22 @@ def plot_bbox(image, bboxes, labels):
 
     # 复制一份用于绘制
     image_draw = image_bgr.copy()
-
+    if labels is None:
+        labels = [""] * len(bboxes)
     for bbox, label in zip(bboxes, labels):
-        # 假设 bbox 格式为 [xmin, ymin, xmax, ymax]
-        xmin, ymin, xmax, ymax = map(int, bbox)
-        # 绘制边框，颜色为蓝色（BGR 下蓝色为 (255,0,0)），线宽2
+        if format == 'xyxy':
+            # 假设 bbox 格式为 [xmin, ymin, xmax, ymax]
+            xmin, ymin, xmax, ymax = map(int, bbox)
+        else:
+            # 假设 bbox 格式为 [cx, cy, w, h]
+            cx, cy, w, h = map(int, bbox)
+            xmin = int(cx - w / 2)
+            ymin = int(cy - h / 2)
+            xmax = int(cx + w / 2)
+            ymax = int(cy + h / 2)
+        # 绘制边框，颜色为蓝色（BGR 下蓝色为 (255,0,0)），线宽1
         cv2.rectangle(
-            image_draw, (xmin, ymin), (xmax, ymax), color=(255, 0, 0), thickness=2
+            image_draw, (xmin, ymin), (xmax, ymax), color=(255, 0, 0), thickness=1
         )
         cv2.putText(
             image_draw,
@@ -39,7 +48,6 @@ def plot_bbox(image, bboxes, labels):
             (255, 0, 0),
             thickness=2,
         )
-
     # 绘制结束后将图像从 BGR 转回 RGB 再用 pyplot 显示
     image_rgb = cv2.cvtColor(image_draw, cv2.COLOR_BGR2RGB)
 
