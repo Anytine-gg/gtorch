@@ -6,6 +6,7 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 from gtorch.utils.misc.plot import plot_bbox
 import cv2
+from gtorch.utils.datasets.FasterRCNNDataset import FasterRCNNDataset
 transform = A.Compose(
         [
             A.Resize(600,800),
@@ -18,7 +19,8 @@ transform = A.Compose(
         bbox_params=A.BboxParams(format="pascal_voc", label_fields=["labels"]),
     )
 if __name__ == '__main__':
-    train_dataset = VOCDetection_(image_set='train',transform=transform)  
     batch_size = 16
-    image,bboxes,labels = train_dataset[0]
-    plot_bbox(image,bboxes,labels)
+    train_dataset = VOCDetection_(image_set='train',transform=transform)   
+    train_dataset = FasterRCNNDataset(train_dataset)
+    image,label_cls,label_reg = train_dataset[0]
+    
