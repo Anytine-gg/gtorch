@@ -300,7 +300,7 @@ def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16):
 
     return all_anchors
     
-
+    
 if __name__ == "__main__":
     feat_size = (50, 38)
     stride = 16
