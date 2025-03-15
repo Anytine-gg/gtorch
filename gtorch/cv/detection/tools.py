@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from gtorch.cv.detection import get_default_anchor_size
-
+import numpy as np
 
 def calc_IoU(box1, box2):
     """
@@ -262,9 +262,46 @@ def nms(
     reserved_anchors = torch.stack(reserved_anchors)
     return reserved_anchors
 
+def AnchorGenerator(feat_size, scale=[8, 16, 32], ratio=[0.5, 1, 2], stride=16):
+    # 基础尺寸
+    base_size = stride
+
+    # 生成基础锚框
+    base_anchors = []
+    for s in scale:
+        for r in ratio:
+            w = base_size * s * np.sqrt(r)
+            h = base_size * s / np.sqrt(r)
+            base_anchors.append([-w/2, -h/2, w/2, h/2])
+
+    # 转换为张量
+    base_anchors = torch.tensor(base_anchors, dtype=torch.float32)
+
+    # 计算特征图上的网格点
+    grid_y, grid_x = torch.meshgrid(
+        torch.arange(feat_size[0]) * stride,
+        torch.arange(feat_size[1]) * stride,
+        indexing='ij'
+    )
+    
+    # 改变网格点形状以便广播
+    grid_points = torch.stack([
+        grid_x.reshape(-1),
+        grid_y.reshape(-1),
+        grid_x.reshape(-1),
+        grid_y.reshape(-1)
+    ], dim=1)  # shape: (H*W, 4)
+
+    # 广播相加生成所有锚框
+    all_anchors = (
+        grid_points.unsqueeze(1) + 
+        base_anchors.unsqueeze(0)
+    ).reshape(-1, 4)  # shape: (H*W*num_anchors, 4)
+
+    return all_anchors
+    
 
 if __name__ == "__main__":
-
-    feat = torch.randint(0,2,(1, 75, 52, 52)).float().to("cuda")
-    # nms(feat)
-    print(yolo3_loss(feat, torch.clone(feat)))
+    feat_size = (50, 38)
+    stride = 16
+    print(AnchorGenerator(feat_size))

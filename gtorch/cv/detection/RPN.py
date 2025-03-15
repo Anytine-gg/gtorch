@@ -21,3 +21,4 @@ class RPNHead(nn.Module):
         logits = self.cls(x)
         reg = self.bbox_reg(x)
         return logits, reg
+    
