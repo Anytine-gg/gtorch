@@ -83,3 +83,35 @@ def plot_seg(image, label):
 
     plt.show()
 
+def plot_img(image):
+    """显示图像，支持numpy array和torch tensor格式
+    
+    Args:
+        image: numpy array或torch tensor格式的图像
+              支持(H,W), (H,W,C)或(C,H,W)格式
+    """
+    
+    # 转换为numpy array
+    if isinstance(image, torch.Tensor):
+        image = image.detach().cpu().numpy()
+    
+    # 处理通道顺序
+    if len(image.shape) == 3:
+        if image.shape[0] in [1, 3]:  # (C,H,W)格式
+            image = np.transpose(image, (1, 2, 0))
+        if image.shape[2] == 1:  # (H,W,1)格式
+            image = image.squeeze()
+            
+    # 处理值范围
+    if image.max() <= 1.0:
+        image = image * 255
+    image = image.astype(np.uint8)
+    
+    # 显示图像
+    plt.figure(figsize=(8, 8))
+    if len(image.shape) == 2 or image.shape[-1] == 1:  # 灰度图
+        plt.imshow(image, cmap='gray')
+    else:  # RGB图
+        plt.imshow(image)
+    plt.axis('off')
+    plt.show()
