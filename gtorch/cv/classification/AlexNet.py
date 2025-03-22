@@ -98,7 +98,7 @@ def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device)
 
 
 if __name__ == "__main__":
-    device = 'cudaww'
+    device = 'cuda'
     transform = transforms.Compose(
         [
             transforms.Resize((227, 227)),  # 调整图像大小
