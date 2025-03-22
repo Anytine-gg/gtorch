@@ -5,6 +5,7 @@ import torchvision.models
 import torchvision.transforms as transforms
 import gtorch.utils.misc.plot as gplt
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm  # 添加此行
 
 
 class AlexNet(nn.Module):
@@ -52,10 +53,11 @@ class AlexNet(nn.Module):
 
 
 def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device):
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     epoch_loss = 0.0
     model.train()
-    for img, label in train_loader:
+    train_loader_tqdm = tqdm(train_loader, desc=f"Training Epoch {idx}")  # 使用tqdm包装train_loader
+    for img, label in train_loader_tqdm:
         img = img.to(device)
         label = label.to(device)
         pred = model(img)
@@ -64,30 +66,39 @@ def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device)
         l.backward()
         optimizer.step()
         epoch_loss += l.item()
+        train_loader_tqdm.set_postfix(loss=l.item())  # 在tqdm中显示当前批次的损失值
+
     model.eval()
+    correct = 0
+    total = 0
+    val_loss = 0.0
     with torch.no_grad():
-        val_loss = 0.0
-        for img, label in val_loader:
+        val_loader_tqdm = tqdm(val_loader, desc=f"Validation Epoch {idx}")  # 使用tqdm包装val_loader
+        for img, label in val_loader_tqdm:
             img = img.to(device)
             label = label.to(device)
             pred = model(img)
             l = loss(pred, label)
             val_loss += l.item()
+            _, predicted = torch.max(pred.data, 1)
+            total += label.size(0)
+            correct += (predicted == label).sum().item()
+            val_loader_tqdm.set_postfix(loss=l.item())  # 在tqdm中显示当前批次的损失值
+        accuracy = 100 * correct / total
         print(
-            f"Epoch: {idx}, TrainLoss: {epoch_loss/len(train_loader)}, ValLoss: {val_loss/len(val_loader)}"
+            f"Epoch: {idx}, TrainLoss: {epoch_loss/len(train_loader)}, ValLoss: {val_loss/len(val_loader)}, Accuracy: {accuracy}%"
         )
 
-
-def train_epochs(model,train_dataset, val_dataset, batch_size,nEpochs,device):
-    train_loader = DataLoader(train_dataset,batch_size,True)
-    val_loader = DataLoader(val_dataset,batch_size,False)
+def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device):
+    train_loader = DataLoader(train_dataset, batch_size, True)
+    val_loader = DataLoader(val_dataset, batch_size, False)
     loss = nn.CrossEntropyLoss()
     for idx in range(nEpochs):
-        train_a_epoch(idx,model,train_loader,val_loader,loss,device)
+        train_a_epoch(idx, model, train_loader, val_loader, loss, device)
 
 
 if __name__ == "__main__":
-    device = 'mps'
+    device = 'cuda'
     transform = transforms.Compose(
         [
             transforms.Resize((227, 227)),  # 调整图像大小
@@ -101,4 +112,5 @@ if __name__ == "__main__":
         "./data", train=True, transform=transform
     )
     val_dataset = torchvision.datasets.MNIST("./data", train=False, transform=transform)
-    train_epochs(net,train_dataset,val_dataset,4,100,device)
+    train_epochs(net, train_dataset, val_dataset, 128, 100, device)
+    
