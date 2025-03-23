@@ -56,7 +56,9 @@ def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     epoch_loss = 0.0
     model.train()
-    train_loader_tqdm = tqdm(train_loader, desc=f"Training Epoch {idx}")  # 使用tqdm包装train_loader
+    train_loader_tqdm = tqdm(
+        train_loader, desc=f"Training Epoch {idx}"
+    )  # 使用tqdm包装train_loader
     for img, label in train_loader_tqdm:
         img = img.to(device)
         label = label.to(device)
@@ -73,7 +75,9 @@ def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device)
     total = 0
     val_loss = 0.0
     with torch.no_grad():
-        val_loader_tqdm = tqdm(val_loader, desc=f"Validation Epoch {idx}")  # 使用tqdm包装val_loader
+        val_loader_tqdm = tqdm(
+            val_loader, desc=f"Validation Epoch {idx}"
+        )  # 使用tqdm包装val_loader
         for img, label in val_loader_tqdm:
             img = img.to(device)
             label = label.to(device)
@@ -89,6 +93,7 @@ def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device)
             f"Epoch: {idx}, TrainLoss: {epoch_loss/len(train_loader)}, ValLoss: {val_loss/len(val_loader)}, Accuracy: {accuracy}%"
         )
 
+
 def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device):
     train_loader = DataLoader(train_dataset, batch_size, True)
     val_loader = DataLoader(val_dataset, batch_size, False)
@@ -98,19 +103,19 @@ def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device)
 
 
 if __name__ == "__main__":
-    device = 'cuda'
+    device = "cuda"
     transform = transforms.Compose(
         [
-            transforms.Resize((227, 227)),  # 调整图像大小
+            # transforms.Resize((227, 227)),  # 调整图像大小
             transforms.ToTensor(),  # 转换为tensor并归一化到[0,1]
             transforms.Normalize((0.1307,), (0.3081,)),  # MNIST数据集的均值和标准差
         ]
     )
-    net = AlexNet(1, 10)
+    # net = AlexNet(1, 10)
+    net = nn.Sequential(nn.Flatten(), nn.Linear(784, 10))
     net.to(device)
     train_dataset = torchvision.datasets.MNIST(
         "./data", train=True, transform=transform
     )
     val_dataset = torchvision.datasets.MNIST("./data", train=False, transform=transform)
     train_epochs(net, train_dataset, val_dataset, 128, 100, device)
-    
