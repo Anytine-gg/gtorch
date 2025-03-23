@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import torchsummary
+
 import torchvision.models
 import torchvision.transforms as transforms
 import gtorch.utils.misc.plot as gplt
@@ -103,6 +103,8 @@ def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device)
 
 
 if __name__ == "__main__":
+    model = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
+    model.to('cuda')
     device = "cuda"
     transform = transforms.Compose(
         [
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         ]
     )
     # net = AlexNet(1, 10)
-    net = nn.Sequential(nn.Flatten(), nn.Linear(784, 10))
+    net = nn.Sequential(nn.Linear(384, 10))
     net.to(device)
     train_dataset = torchvision.datasets.MNIST(
         "./data", train=True, transform=transform

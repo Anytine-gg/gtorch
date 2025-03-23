@@ -1,23 +1,22 @@
 # 使用Albumentations的VOC分割数据集
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import VOCDetection, VOCSegmentation
+import albumentations as A
+import numpy as np
 
-
-class VOCSegmentation(Dataset):
+class VOCSegmentation_(Dataset):
     def __init__(
         self,
-        dir,
+        root,
         year="2012",
         image_set="train",
         download=False,
-        transform=None,
-        target_transform=None,
+        transform=None
     ):
         super().__init__()
         self.transform = transform
-        self.target_transform = target_transform
         self.voc_dataset = VOCSegmentation(
-            root=dir,
+            root=root,
             year=year,
             image_set=image_set,
             download=download,
@@ -29,4 +28,12 @@ class VOCSegmentation(Dataset):
         return len(self.voc_dataset)
 
     def __getitem__(self, index):
-        pass
+        img, target = self.voc_dataset[index]
+        img = np.array(img)
+        target = np.array(target)
+        if self.transform:
+            augmented = self.transform(image=img, mask=target)
+            img = augmented['image'].float()
+            target = augmented['mask'].long()
+        return img, target
+

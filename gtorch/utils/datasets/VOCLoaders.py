@@ -1,5 +1,4 @@
 import os
-from turtle import down
 import numpy as np
 import torch
 from torchvision import transforms
@@ -9,6 +8,7 @@ import matplotlib.pyplot as plt
 from albumentations.pytorch import ToTensorV2
 import albumentations as A
 import cv2
+from gtorch.utils.misc.plot import plot_seg
 from gtorch.utils.datasets.VOCDetection_ import VOCDetection_
 from gtorch.utils.datasets.YOLOv3Dataset import YOLOv3_Dataset
 
@@ -65,9 +65,9 @@ def SegmentationDemo():
     np.set_printoptions(threshold=np.inf)
 
     print(np.array(label).shape)
-    plot_img_seg(image,label)
+    plot_seg(image,label)
 
     
 
 if __name__ == "__main__":
-    detectionDemo()
+    SegmentationDemo()
