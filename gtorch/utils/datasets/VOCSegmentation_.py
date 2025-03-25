@@ -33,7 +33,7 @@ class VOCSegmentation_(Dataset):
         target = np.array(target)
         if self.transform:
             augmented = self.transform(image=img, mask=target)
-            img = augmented['image'].float()
-            target = augmented['mask'].long()
+            img = augmented['image']
+            target = augmented['mask']
         return img, target
 

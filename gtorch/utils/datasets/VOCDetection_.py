@@ -48,7 +48,7 @@ class VOCDetection_(Dataset):
             transform=None,
         )
 
-    def __getitem__(self, index):
+    def __getitem__(self, index):  #xyxy格式
         image, target = self.voc_dataset[index]
         image = np.array(image)
         objects = target["annotation"]["object"]
