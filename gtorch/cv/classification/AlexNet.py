@@ -94,6 +94,53 @@ def train_a_epoch(idx, model: nn.Module, train_loader, val_loader, loss, device)
         )
 
 
+def train_a_epochs_dino(
+    idx, model1: nn.Module, model: nn.Module, train_loader, val_loader, loss, device
+):
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    epoch_loss = 0.0
+    model.train()
+    train_loader_tqdm = tqdm(
+        train_loader, desc=f"Training Epoch {idx}"
+    )  # 使用tqdm包装train_loader
+    for img, label in train_loader_tqdm:
+        img = img.to(device)
+        label = label.to(device)
+        with torch.no_grad():
+            features = model1(img)
+        pred = model(features)
+        l = loss(pred, label)
+        optimizer.zero_grad()
+        l.backward()
+        optimizer.step()
+        epoch_loss += l.item()
+        train_loader_tqdm.set_postfix(loss=l.item())  # 在tqdm中显示当前批次的损失值
+
+    model.eval()
+    correct = 0
+    total = 0
+    val_loss = 0.0
+    with torch.no_grad():
+        val_loader_tqdm = tqdm(
+            val_loader, desc=f"Validation Epoch {idx}"
+        )  # 使用tqdm包装val_loader
+        for img, label in val_loader_tqdm:
+            img = img.to(device)
+            label = label.to(device)
+            features = model1(img)
+            pred = model(features)
+            l = loss(pred, label)
+            val_loss += l.item()
+            _, predicted = torch.max(pred.data, 1)
+            total += label.size(0)
+            correct += (predicted == label).sum().item()
+            val_loader_tqdm.set_postfix(loss=l.item())  # 在tqdm中显示当前批次的损失值
+        accuracy = 100 * correct / total
+        print(
+            f"Epoch: {idx}, TrainLoss: {epoch_loss/len(train_loader)}, ValLoss: {val_loss/len(val_loader)}, Accuracy: {accuracy}%"
+        )
+
+
 def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device):
     train_loader = DataLoader(train_dataset, batch_size, True)
     val_loader = DataLoader(val_dataset, batch_size, False)
@@ -104,13 +151,17 @@ def train_epochs(model, train_dataset, val_dataset, batch_size, nEpochs, device)
 
 if __name__ == "__main__":
     model = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14")
-    model.to('cuda')
+    model.to("cuda")
+    model.eval()
     device = "cuda"
     transform = transforms.Compose(
         [
-            # transforms.Resize((227, 227)),  # 调整图像大小
-            transforms.ToTensor(),  # 转换为tensor并归一化到[0,1]
-            transforms.Normalize((0.1307,), (0.3081,)),  # MNIST数据集的均值和标准差
+            transforms.Resize([224, 224]),  # DINO需要224x224
+            transforms.Grayscale(num_output_channels=3),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]  # ImageNet参数
+            ),
         ]
     )
     # net = AlexNet(1, 10)
@@ -120,4 +171,8 @@ if __name__ == "__main__":
         "./data", train=True, transform=transform
     )
     val_dataset = torchvision.datasets.MNIST("./data", train=False, transform=transform)
-    train_epochs(net, train_dataset, val_dataset, 128, 100, device)
+    train_loader = DataLoader(train_dataset, 32, True)
+    val_loader = DataLoader(val_dataset, 32, False)
+    loss = nn.CrossEntropyLoss()
+    for idx in range(100):
+        train_a_epochs_dino(idx, model, net, train_loader, val_loader, loss, device)
